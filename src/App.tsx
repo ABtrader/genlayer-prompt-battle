@@ -2,25 +2,40 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import "./App.css";
 
+type Player = {
+  id: string;
+  name: string;
+  score: number;
+  submitted: boolean;
+  completionTime: number;
+};
+
+type Challenge = {
+  title: string;
+  question: string;
+  options: string[];
+  correct: number;
+};
+
 const socket = io("https://genlayer-prompt-battle.onrender.com");
 const CLIENT_ID = "1509214466540044298";
 const GAME_DURATION = 300;
 
 export default function App() {
-  const [joined, setJoined] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [username, setUsername] = useState("");
-  const [challengeIndex, setChallengeIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
-  const [players, setPlayers] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
+  const [joined, setJoined] = useState<boolean>(false);
+  const [gameStarted, setGameStarted] = useState<boolean>(false);
+  const [username, setUsername] = useState<string>("");
+  const [challengeIndex, setChallengeIndex] = useState<number>(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState<boolean>(false);
+  const [score, setScore] = useState<number>(0);
+  const [finished, setFinished] = useState<boolean>(false);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [timeLeft, setTimeLeft] = useState<number>(GAME_DURATION);
 
   const roomId = "GL-WEEKLY-ARENA";
 
-  const challenges = [
+  const challenges: Challenge[] = [
     {
       title: "Question 1: Intelligent Contracts",
       question: "What makes GenLayer Intelligent Contracts different from traditional smart contracts?",
@@ -126,7 +141,7 @@ export default function App() {
   const currentChallenge = challenges[challengeIndex];
 
   useEffect(() => {
-    socket.on("gameState", (data) => {
+    socket.on("gameState", (data: { players?: Player[] }) => {
       setPlayers(data.players || []);
     });
 
@@ -146,7 +161,7 @@ export default function App() {
         },
       })
         .then((res) => res.json())
-        .then((user) => {
+        .then((user: { username?: string }) => {
           if (user.username) {
             setUsername(user.username);
             socket.emit("joinRoom", user.username);
@@ -168,7 +183,7 @@ export default function App() {
   }, [joined, gameStarted, timeLeft, finished]);
 
   const loginWithDiscord = () => {
-    const redirectUri = encodeURIComponent("http://localhost:5173");
+    const redirectUri = encodeURIComponent("https://genlayer-prompt-battle.vercel.app");
 
     window.location.href =
       `https://discord.com/oauth2/authorize` +
