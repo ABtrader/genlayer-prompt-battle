@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import "./App.css";
 
-const socket = io("http://localhost:3001");
+const socket = io("https://genlayer-prompt-battle.onrender.com");
 const CLIENT_ID = "1509214466540044298";
 const GAME_DURATION = 300;
 
