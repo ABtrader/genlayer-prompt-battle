@@ -27,23 +27,27 @@ const leaderboardFile = path.join(
 
 let players = [];
 
-/*
-  FORCE CLEAN START
-*/
+function loadLeaderboard() {
+  try {
+    if (fs.existsSync(leaderboardFile)) {
+      const data = fs.readFileSync(
+        leaderboardFile,
+        "utf-8"
+      );
 
-try {
-  fs.writeFileSync(
-    leaderboardFile,
-    JSON.stringify([], null, 2)
-  );
+      players = JSON.parse(data);
 
-  players = [];
-
-  console.log(
-    "Leaderboard initialized clean"
-  );
-} catch (error) {
-  console.log(error);
+      if (!Array.isArray(players)) {
+        players = [];
+      }
+    } else {
+      players = [];
+      saveLeaderboard();
+    }
+  } catch (error) {
+    console.error(error);
+    players = [];
+  }
 }
 
 function saveLeaderboard() {
@@ -52,6 +56,8 @@ function saveLeaderboard() {
     JSON.stringify(players, null, 2)
   );
 }
+
+loadLeaderboard();
 
 app.get("/", (req, res) => {
   res.send(
@@ -74,10 +80,7 @@ app.post("/admin/reset", (req, res) => {
 
   players = [];
 
-  fs.writeFileSync(
-    leaderboardFile,
-    JSON.stringify([], null, 2)
-  );
+  saveLeaderboard();
 
   io.emit("gameState", {
     players: [],
@@ -127,22 +130,26 @@ io.on("connection", (socket) => {
   socket.on(
     "joinRoom",
     (username) => {
-      const existingPlayer =
+      let existingPlayer =
         players.find(
           (player) =>
             player.name === username
         );
 
       if (!existingPlayer) {
-        players.push({
+        existingPlayer = {
           id: socket.id,
           name: username,
           score: 0,
           submitted: false,
           completionTime: 0,
-        });
+        };
+
+        players.push(existingPlayer);
 
         saveLeaderboard();
+      } else {
+        existingPlayer.id = socket.id;
       }
 
       io.emit("gameState", {
@@ -165,7 +172,15 @@ io.on("connection", (socket) => {
 
       if (!player) return;
 
+      /*
+        BLOCK REPLAY
+      */
+
       if (player.submitted) {
+        console.log(
+          "Replay attempt blocked"
+        );
+
         return;
       }
 
