@@ -24,23 +24,37 @@ const ADMIN_SECRET = "change-this-before-live";
 const leaderboardFile = path.join(__dirname, "leaderboard.json");
 
 let players = [];
+const connectedUsers = new Map();
+
+function cleanPlayer(player) {
+  return {
+    name: String(player.name || ""),
+    score: Number(player.score || 0),
+    lastWeeklyScore: Number(player.lastWeeklyScore || 0),
+    submitted: Boolean(player.submitted),
+    completionTime: Number(player.completionTime || 0),
+  };
+}
 
 function loadLeaderboard() {
   try {
     if (fs.existsSync(leaderboardFile)) {
       const data = fs.readFileSync(leaderboardFile, "utf-8");
-      players = JSON.parse(data);
+      const parsed = JSON.parse(data);
 
-      if (!Array.isArray(players)) {
-        players = [];
-      }
+      players = Array.isArray(parsed)
+        ? parsed
+            .filter((player) => player.name && Number(player.score || 0) > 0)
+            .map(cleanPlayer)
+        : [];
     } else {
       players = [];
       saveLeaderboard();
     }
   } catch (error) {
-    console.error(error);
+    console.error("Error loading leaderboard:", error);
     players = [];
+    saveLeaderboard();
   }
 }
 
@@ -59,6 +73,12 @@ function sortPlayers(list) {
   });
 }
 
+function broadcastLeaderboard() {
+  io.emit("gameState", {
+    players: sortPlayers(players),
+  });
+}
+
 loadLeaderboard();
 
 app.get("/", (req, res) => {
@@ -69,11 +89,6 @@ app.get("/leaderboard", (req, res) => {
   res.json(sortPlayers(players));
 });
 
-/*
-  HARD RESET:
-  Use this only before your first real public launch
-  or when you want to delete all test data completely.
-*/
 app.post("/admin/reset", (req, res) => {
   const secret = req.headers["x-admin-secret"];
 
@@ -86,9 +101,7 @@ app.post("/admin/reset", (req, res) => {
   players = [];
   saveLeaderboard();
 
-  io.emit("gameState", {
-    players: [],
-  });
+  broadcastLeaderboard();
 
   console.log("Leaderboard fully reset");
 
@@ -98,12 +111,6 @@ app.post("/admin/reset", (req, res) => {
   });
 });
 
-/*
-  NEW WEEK:
-  Use this after each weekly event.
-  It keeps old total scores but unlocks players
-  so they can participate again.
-*/
 app.post("/admin/new-week", (req, res) => {
   const secret = req.headers["x-admin-secret"];
 
@@ -121,10 +128,7 @@ app.post("/admin/new-week", (req, res) => {
   }));
 
   saveLeaderboard();
-
-  io.emit("gameState", {
-    players: sortPlayers(players),
-  });
+  broadcastLeaderboard();
 
   console.log("New weekly event started. Total scores preserved.");
 
@@ -147,8 +151,7 @@ async function submitToGenLayer(username, score, completionTime) {
 
     return true;
   } catch (error) {
-    console.error(error);
-
+    console.error("GenLayer submission failed:", error);
     return false;
   }
 }
@@ -161,11 +164,42 @@ io.on("connection", (socket) => {
   });
 
   socket.on("joinRoom", (username) => {
-    let existingPlayer = players.find((player) => player.name === username);
+    if (!username) return;
 
-    if (!existingPlayer) {
-      existingPlayer = {
-        id: socket.id,
+    connectedUsers.set(socket.id, username);
+
+    socket.emit("gameState", {
+      players: sortPlayers(players),
+    });
+
+    console.log(`${username} connected but not added to leaderboard yet`);
+  });
+
+  socket.on("submitFinalScore", async ({ finalScore, completionTime }) => {
+    const username = connectedUsers.get(socket.id);
+
+    if (!username) {
+      console.log("Score rejected: no username connected");
+      return;
+    }
+
+    const weeklyScore = Number(finalScore || 0);
+    const timeTaken = Number(completionTime || 0);
+
+    if (weeklyScore <= 0) {
+      console.log("Score rejected: score is zero");
+      return;
+    }
+
+    let player = players.find((p) => p.name === username);
+
+    if (player && player.submitted) {
+      console.log("Replay attempt blocked");
+      return;
+    }
+
+    if (!player) {
+      player = {
         name: username,
         score: 0,
         lastWeeklyScore: 0,
@@ -173,56 +207,23 @@ io.on("connection", (socket) => {
         completionTime: 0,
       };
 
-      players.push(existingPlayer);
-      saveLeaderboard();
-    } else {
-      existingPlayer.id = socket.id;
-      saveLeaderboard();
+      players.push(player);
     }
 
-    io.emit("gameState", {
-      players: sortPlayers(players),
-    });
-  });
-
-  socket.on("submitFinalScore", async ({ finalScore, completionTime }) => {
-    const player = players.find((p) => p.id === socket.id);
-
-    if (!player) return;
-
-    /*
-      BLOCK REPLAY FOR THE CURRENT WEEK
-    */
-    if (player.submitted) {
-      console.log("Replay attempt blocked");
-      return;
-    }
-
-    const weeklyScore = Number(finalScore || 0);
-
-    /*
-      IMPORTANT:
-      This adds the new weekly score to the previous total score.
-      Example:
-      Week 1 = 110
-      Week 2 = 150
-      Total = 260
-    */
     player.score = Number(player.score || 0) + weeklyScore;
     player.lastWeeklyScore = weeklyScore;
     player.submitted = true;
-    player.completionTime = Number(completionTime || 0);
+    player.completionTime = timeTaken;
 
     saveLeaderboard();
 
-    await submitToGenLayer(player.name, weeklyScore, completionTime);
+    await submitToGenLayer(username, weeklyScore, timeTaken);
 
-    io.emit("gameState", {
-      players: sortPlayers(players),
-    });
+    broadcastLeaderboard();
   });
 
   socket.on("disconnect", () => {
+    connectedUsers.delete(socket.id);
     console.log("User disconnected");
   });
 });
