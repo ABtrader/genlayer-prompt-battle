@@ -1,11 +1,12 @@
 const express = require("express");
 const http = require("http");
+const { Server } = require("socket.io");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
-const { Server } = require("socket.io");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -14,85 +15,117 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"],
   },
 });
 
-const PORT = 3001;
-const ADMIN_SECRET = "change-this-before-live";
-const DATA_FILE = path.join(__dirname, "leaderboard.json");
+const PORT = process.env.PORT || 3001;
+
+const leaderboardFile = path.join(
+  __dirname,
+  "leaderboard.json"
+);
 
 let players = [];
 
 function loadLeaderboard() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const savedData = fs.readFileSync(DATA_FILE, "utf8");
-      players = JSON.parse(savedData);
-    }
-  } catch (error) {
-    console.log("Could not load leaderboard:", error.message);
-    players = [];
+  if (fs.existsSync(leaderboardFile)) {
+    const data = fs.readFileSync(
+      leaderboardFile,
+      "utf-8"
+    );
+
+    players = JSON.parse(data);
   }
 }
 
 function saveLeaderboard() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(players, null, 2));
-  } catch (error) {
-    console.log("Could not save leaderboard:", error.message);
-  }
-}
-
-function getSortedPlayers() {
-  return [...players].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-
-    const aTime = a.completionTime || 999999;
-    const bTime = b.completionTime || 999999;
-
-    return aTime - bTime;
-  });
+  fs.writeFileSync(
+    leaderboardFile,
+    JSON.stringify(players, null, 2)
+  );
 }
 
 loadLeaderboard();
 
 app.get("/", (req, res) => {
-  res.send("Prompt Battle Arena backend is live.");
+  res.send("GenLayer Prompt Battle Backend Live");
+});
+
+app.get("/leaderboard", (req, res) => {
+  res.json(players);
 });
 
 app.post("/admin/reset", (req, res) => {
   const secret = req.headers["x-admin-secret"];
 
-  if (secret !== ADMIN_SECRET) {
-    return res.status(403).json({
-      success: false,
-      message: "Unauthorized reset attempt.",
+  if (secret !== "change-this-before-live") {
+    return res.status(401).json({
+      error: "Unauthorized",
     });
   }
 
   players = [];
+
   saveLeaderboard();
 
-  io.emit("gameState", {
-    players: getSortedPlayers(),
-  });
+  io.emit("gameState", { players });
 
-  return res.json({
+  res.json({
     success: true,
-    message: "Leaderboard reset successfully.",
+    message: "Leaderboard reset successfully",
   });
 });
 
+async function submitToGenLayer(
+  username,
+  score,
+  completionTime
+) {
+  try {
+    console.log(
+      "Submitting score to GenLayer..."
+    );
+
+    console.log({
+      username,
+      score,
+      completionTime,
+    });
+
+    /*
+      FUTURE REAL RPC INTEGRATION AREA
+
+      This is where real GenLayer RPC calls
+      will happen later.
+
+      Current MVP:
+      - Backend logs all score submissions
+      - Keeps structure ready for actual
+        GenLayer transaction integration
+    */
+
+    return true;
+  } catch (error) {
+    console.error(
+      "GenLayer submission failed:",
+      error
+    );
+
+    return false;
+  }
+}
+
 io.on("connection", (socket) => {
-  console.log("Player connected:", socket.id);
+  console.log("User connected");
 
   socket.emit("gameState", {
-    players: getSortedPlayers(),
+    players,
   });
 
   socket.on("joinRoom", (username) => {
-    const existingPlayer = players.find((player) => player.name === username);
+    const existingPlayer = players.find(
+      (player) => player.name === username
+    );
 
     if (!existingPlayer) {
       players.push({
@@ -102,58 +135,63 @@ io.on("connection", (socket) => {
         submitted: false,
         completionTime: 0,
       });
-    } else {
-      players = players.map((player) => {
-        if (player.name === username) {
-          return {
-            ...player,
-            id: socket.id,
-          };
-        }
 
-        return player;
-      });
+      saveLeaderboard();
     }
 
-    saveLeaderboard();
-
     io.emit("gameState", {
-      players: getSortedPlayers(),
+      players,
     });
   });
 
-  socket.on("submitFinalScore", ({ finalScore, completionTime }) => {
-    players = players.map((player) => {
-      if (player.id === socket.id) {
-        const existingScore = player.score || 0;
+  socket.on(
+    "submitFinalScore",
+    async ({
+      finalScore,
+      completionTime,
+    }) => {
+      const player = players.find(
+        (p) => p.id === socket.id
+      );
 
-        if (player.submitted && existingScore >= finalScore) {
-          return player;
-        }
+      if (!player) return;
 
-        return {
-          ...player,
-          score: finalScore,
-          submitted: true,
-          completionTime,
-        };
+      if (player.submitted) {
+        console.log(
+          "Player already submitted"
+        );
+
+        return;
       }
 
-      return player;
-    });
+      player.score = finalScore;
 
-    saveLeaderboard();
+      player.submitted = true;
 
-    io.emit("gameState", {
-      players: getSortedPlayers(),
-    });
-  });
+      player.completionTime =
+        completionTime;
+
+      saveLeaderboard();
+
+      await submitToGenLayer(
+        player.name,
+        finalScore,
+        completionTime
+      );
+
+      io.emit("gameState", {
+        players,
+      });
+    }
+  );
 
   socket.on("disconnect", () => {
-    console.log("Player disconnected:", socket.id);
+    console.log("User disconnected");
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`Multiplayer server running on http://localhost:${PORT}`);
+  console.log(
+    `Server running on port ${PORT}`
+  );
 });
