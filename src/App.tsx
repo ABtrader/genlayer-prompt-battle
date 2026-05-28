@@ -18,10 +18,9 @@ type Challenge = {
 };
 
 const socket = io("https://genlayer-prompt-battle.onrender.com");
-
 const CLIENT_ID = "1509214466540044298";
-
 const GAME_DURATION = 300;
+const MAX_SCORE = 250;
 
 const GENLAYER_CONTRACT =
   import.meta.env.VITE_GENLAYER_CONTRACT_ADDRESS;
@@ -29,6 +28,7 @@ const GENLAYER_CONTRACT =
 export default function App() {
   const [joined, setJoined] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [username, setUsername] = useState("");
   const [challengeIndex, setChallengeIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -46,33 +46,33 @@ export default function App() {
       question:
         "What makes GenLayer Intelligent Contracts different from traditional smart contracts?",
       options: [
-        "They can reason with AI and evaluate subjective information.",
         "They only transfer tokens between wallets.",
+        "They can reason with AI and evaluate subjective information.",
         "They are used only for storing images.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 2: Optimistic Democracy",
       question:
         "What is the main role of Optimistic Democracy in GenLayer?",
       options: [
-        "To let one admin decide every result.",
         "To help validators reach agreement on AI-generated outputs.",
+        "To let one admin decide every result.",
         "To stop users from joining applications.",
       ],
-      correct: 1,
+      correct: 0,
     },
     {
       title: "Question 3: AI Validators",
       question:
         "Why are AI validators useful in GenLayer?",
       options: [
-        "They help judge outcomes that require reasoning and interpretation.",
         "They replace all frontend developers.",
         "They only count button clicks.",
+        "They help judge outcomes that require reasoning and interpretation.",
       ],
-      correct: 0,
+      correct: 2,
     },
     {
       title: "Question 4: Trustless Adjudication",
@@ -80,54 +80,54 @@ export default function App() {
         "What does trustless adjudication mean?",
       options: [
         "A single host secretly chooses the winner.",
-        "Players are ranked randomly.",
         "Results can be judged fairly without trusting one central person.",
+        "Players are ranked randomly.",
       ],
-      correct: 2,
+      correct: 1,
     },
     {
       title: "Question 5: Subjective Judging",
       question:
         "Which task best shows GenLayer’s strength?",
       options: [
-        "Judging creative answers using AI consensus.",
         "Displaying a fixed welcome message.",
+        "Judging creative answers using AI consensus.",
         "Checking only simple numbers.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 6: Natural Language",
       question:
         "Why is natural language useful for Intelligent Contracts?",
       options: [
-        "It allows contracts to evaluate human-readable input.",
         "It prevents users from writing answers.",
         "It only works with wallet balances.",
+        "It allows contracts to evaluate human-readable input.",
       ],
-      correct: 0,
+      correct: 2,
     },
     {
       title: "Question 7: Community XP",
       question:
         "What is the fairest way to distribute XP in this game?",
       options: [
+        "Give XP based on correct answers and completion time.",
         "Give XP randomly.",
         "Give all XP to the first player.",
-        "Give XP based on correct answers and completion time.",
       ],
-      correct: 2,
+      correct: 0,
     },
     {
       title: "Question 8: Multiplayer Use Case",
       question:
         "Why is GenLayer suitable for multiplayer community games?",
       options: [
-        "It supports fair judging for challenges that are not purely mathematical.",
         "It only supports single-player apps.",
+        "It supports fair judging for challenges that are not purely mathematical.",
         "It removes all game rules.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 9: Consensus",
@@ -135,43 +135,43 @@ export default function App() {
         "What should happen when AI outputs need validation?",
       options: [
         "The game should ignore all answers.",
-        "Validators should help confirm the most reliable result.",
         "Only the fastest player should decide.",
+        "Validators should help confirm the most reliable result.",
       ],
-      correct: 1,
+      correct: 2,
     },
     {
       title: "Question 10: Final GenLayer Round",
       question:
         "Which phrase best describes GenLayer’s role in this game?",
       options: [
+        "An AI-powered coordination layer for fair judgment and consensus.",
         "A normal frontend styling tool.",
         "A file storage app.",
-        "An AI-powered coordination layer for fair judgment and consensus.",
       ],
-      correct: 2,
+      correct: 0,
     },
     {
       title: "Question 11: GenLayer Leadership",
       question:
         "Who is the co-founder and CTO of GenLayer?",
       options: [
-        "Ivan Raskovsky",
         "Vitalik Buterin",
+        "Ivan Raskovsky",
         "Satoshi Nakamoto",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 12: Core Technology",
       question:
         "What is at the heart of GenLayer’s core technology?",
       options: [
-        "Optimistic Democracy.",
         "Proof of Work mining.",
         "Centralized API approval.",
+        "Optimistic Democracy.",
       ],
-      correct: 0,
+      correct: 2,
     },
     {
       title: "Question 13: Consensus Design",
@@ -189,22 +189,22 @@ export default function App() {
       question:
         "What does on-chain AI processing allow GenLayer validators to do?",
       options: [
-        "Connect to AI models for reasoning, natural language understanding, and predictions.",
         "Only send ETH between wallets.",
+        "Connect to AI models for reasoning, natural language understanding, and predictions.",
         "Disable smart contracts completely.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 15: AI Model Integration",
       question:
         "Which type of external systems can GenLayer validators connect to for complex reasoning?",
       options: [
-        "Large Language Models and AI services.",
-        "Only image storage servers.",
         "Only normal calculator apps.",
+        "Only image storage servers.",
+        "Large Language Models and AI services.",
       ],
-      correct: 0,
+      correct: 2,
     },
     {
       title: "Question 16: Consensus-Backed Security",
@@ -222,33 +222,33 @@ export default function App() {
       question:
         "What ability do Intelligent Contracts gain in GenLayer?",
       options: [
-        "They can understand natural language, process real-world data, and adapt to conditions.",
         "They can only store static text.",
+        "They can understand natural language, process real-world data, and adapt to conditions.",
         "They can only create profile pictures.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 18: Validator Software",
       question:
         "What does GenLayer validator software handle?",
       options: [
-        "Networking, block production, and transaction management.",
         "Only website design.",
         "Only social media login.",
+        "Networking, block production, and transaction management.",
       ],
-      correct: 0,
+      correct: 2,
     },
     {
       title: "Question 19: Deterministic Transactions",
       question:
         "What are deterministic transactions in the GenLayer validator framework?",
       options: [
-        "Typical blockchain transactions with predictable results.",
         "Random AI guesses with no verification.",
+        "Typical blockchain transactions with predictable results.",
         "Transactions that cannot be checked.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 20: Non-Deterministic Transactions",
@@ -266,22 +266,22 @@ export default function App() {
       question:
         "GenLayer operates with which two main layers?",
       options: [
-        "GenLayer RPC and GenLayer Chain.",
         "Bitcoin Layer and Filecoin Layer.",
+        "GenLayer RPC and GenLayer Chain.",
         "Frontend Layer and CSS Layer only.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 22: GenLayer RPC",
       question:
         "What does the GenLayer RPC mainly handle?",
       options: [
-        "Intelligent Contract operations using gen_* methods.",
         "Only image rendering.",
         "Only Discord username storage.",
+        "Intelligent Contract operations using gen_* methods.",
       ],
-      correct: 0,
+      correct: 2,
     },
     {
       title: "Question 23: GenLayer Chain",
@@ -299,22 +299,22 @@ export default function App() {
       question:
         "In a common GenLayer app, what does the frontend or backend usually do?",
       options: [
-        "Collect user intent, display data, handle indexing, and prepare evidence.",
         "Own every consensus-critical decision alone.",
+        "Collect user intent, display data, handle indexing, and prepare evidence.",
         "Replace validators completely.",
       ],
-      correct: 0,
+      correct: 1,
     },
     {
       title: "Question 25: Validator Verification",
       question:
         "What do GenLayer validators do in the common architecture pattern?",
       options: [
-        "They independently verify the leader’s result using evidence and the equivalence principle.",
-        "They randomly choose winners without checking evidence.",
-        "They only change page colors.",
+        "Randomly choose winners without checking evidence.",
+        "Only change page colors.",
+        "Independently verify the leader’s result using evidence and the equivalence principle.",
       ],
-      correct: 0,
+      correct: 2,
     },
   ];
 
@@ -347,11 +347,8 @@ export default function App() {
         .then((user: { username?: string }) => {
           if (user.username) {
             setUsername(user.username);
-
             socket.emit("joinRoom", user.username);
-
             setJoined(true);
-
             window.history.replaceState({}, document.title, "/");
           }
         });
@@ -382,7 +379,7 @@ export default function App() {
   };
 
   const handleSubmit = () => {
-    if (selectedAnswer === null) return;
+    if (selectedAnswer === null || submitted) return;
 
     if (selectedAnswer === currentChallenge.correct) {
       setScore((prev) => prev + 10);
@@ -394,20 +391,13 @@ export default function App() {
   const nextQuestion = () => {
     if (challengeIndex + 1 < challenges.length) {
       setChallengeIndex((prev) => prev + 1);
-
       setSelectedAnswer(null);
-
       setSubmitted(false);
-
       return;
     }
 
-    const finalScore =
-      selectedAnswer === currentChallenge.correct ? score + 10 : score;
-
+    const finalScore = score;
     const completionTime = GAME_DURATION - timeLeft;
-
-    setScore(finalScore);
 
     setFinished(true);
 
@@ -421,13 +411,49 @@ export default function App() {
 
   const leaderboard = [...players].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-
     return a.completionTime - b.completionTime;
   });
 
   const minutes = Math.floor(timeLeft / 60);
-
   const seconds = timeLeft % 60;
+
+  const LeaderboardView = () => (
+    <div className="card">
+      <h2>🏆 Live Leaderboard</h2>
+
+      <p className="footer">
+        Ranking is based on score first. If scores are tied, faster completion time ranks higher.
+      </p>
+
+      <div className="leaderboard">
+        {leaderboard.length === 0 ? (
+          <p className="footer">No players on the leaderboard yet.</p>
+        ) : (
+          leaderboard.map((player, index) => (
+            <div
+              key={player.id}
+              className={`player ${
+                player.name === username ? "highlight" : ""
+              }`}
+            >
+              <span>
+                #{index + 1} {player.name}
+              </span>
+
+              <span>
+                {player.score} / {MAX_SCORE}
+                {player.submitted && ` • ${player.completionTime}s`}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button onClick={() => setShowLeaderboard(false)}>
+        Back to Game
+      </button>
+    </div>
+  );
 
   return (
     <div className="container">
@@ -437,7 +463,23 @@ export default function App() {
         Weekly GenLayer Community Challenge
       </p>
 
-      {!joined ? (
+      {joined && (
+        <div className="card" style={{ marginBottom: "18px" }}>
+          <div className="topbar">
+            <button onClick={() => setShowLeaderboard(false)}>
+              Game
+            </button>
+
+            <button onClick={() => setShowLeaderboard(true)}>
+              Leaderboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showLeaderboard ? (
+        <LeaderboardView />
+      ) : !joined ? (
         <div className="card">
           <h2>Join With Discord</h2>
 
@@ -460,28 +502,20 @@ export default function App() {
             </p>
 
             <p>
-              This game now includes a deployed GenLayer Intelligent Contract
-              for score tracking.
+              This game includes a deployed GenLayer Intelligent Contract for score tracking.
             </p>
 
             <h3>Game Rules</h3>
 
             <p>• You will answer 25 GenLayer-focused questions.</p>
-
             <p>• You have 5 minutes to complete the game.</p>
-
             <p>• Each correct answer gives 10 XP.</p>
-
             <p>• Incorrect answers give 0 score.</p>
-
             <p>• Maximum possible score is 250 XP.</p>
-
             <p>• Same score = faster completion time ranks higher.</p>
-
             <p>• Results are connected to a deployed GenLayer contract.</p>
 
             <p>Contract Address:</p>
-
             <p>{GENLAYER_CONTRACT}</p>
           </div>
 
@@ -494,7 +528,7 @@ export default function App() {
           <h2>🏆 Final Leaderboard</h2>
 
           <p className="footer">
-            Your Final Score: {score} / 250
+            Your Final Score: {score} / {MAX_SCORE}
           </p>
 
           <div className="leaderboard">
@@ -510,7 +544,7 @@ export default function App() {
                 </span>
 
                 <span>
-                  {player.score} / 250
+                  {player.score} / {MAX_SCORE}
                   {player.submitted && ` • ${player.completionTime}s`}
                 </span>
               </div>
@@ -536,7 +570,7 @@ export default function App() {
           </p>
 
           <p className="footer">
-            Current Score: {score} / 250
+            Current Score: {score} / {MAX_SCORE}
           </p>
 
           <h2>{currentChallenge.title}</h2>
