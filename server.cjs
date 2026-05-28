@@ -2,8 +2,10 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
+const dotenv = require("dotenv");
+const { createClient } = require("@supabase/supabase-js");
+
+dotenv.config();
 
 const app = express();
 
@@ -21,75 +23,58 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3001;
 const ADMIN_SECRET = "change-this-before-live";
 
-const leaderboardFile = path.join(__dirname, "leaderboard.json");
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
-let players = [];
 const connectedUsers = new Map();
-
-function cleanPlayer(player) {
-  return {
-    name: String(player.name || ""),
-    score: Number(player.score || 0),
-    lastWeeklyScore: Number(player.lastWeeklyScore || 0),
-    submitted: Boolean(player.submitted),
-    completionTime: Number(player.completionTime || 0),
-  };
-}
-
-function loadLeaderboard() {
-  try {
-    if (fs.existsSync(leaderboardFile)) {
-      const data = fs.readFileSync(leaderboardFile, "utf-8");
-      const parsed = JSON.parse(data);
-
-      players = Array.isArray(parsed)
-        ? parsed
-            .filter((player) => player.name && Number(player.score || 0) > 0)
-            .map(cleanPlayer)
-        : [];
-    } else {
-      players = [];
-      saveLeaderboard();
-    }
-  } catch (error) {
-    console.error("Error loading leaderboard:", error);
-    players = [];
-    saveLeaderboard();
-  }
-}
-
-function saveLeaderboard() {
-  fs.writeFileSync(leaderboardFile, JSON.stringify(players, null, 2));
-}
 
 function sortPlayers(list) {
   return [...list].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
+    if (b.total_score !== a.total_score) {
+      return b.total_score - a.total_score;
+    }
 
-    const aTime = a.completionTime || 999999;
-    const bTime = b.completionTime || 999999;
-
-    return aTime - bTime;
+    return a.completion_time - b.completion_time;
   });
 }
 
-function broadcastLeaderboard() {
+async function getLeaderboard() {
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select("*");
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  return sortPlayers(data || []);
+}
+
+async function broadcastLeaderboard() {
+  const players = await getLeaderboard();
+
   io.emit("gameState", {
-    players: sortPlayers(players),
+    players,
   });
 }
-
-loadLeaderboard();
 
 app.get("/", (req, res) => {
   res.send("GenLayer Prompt Battle Backend Live");
 });
 
-app.get("/leaderboard", (req, res) => {
-  res.json(sortPlayers(players));
+app.get("/leaderboard", async (req, res) => {
+  const players = await getLeaderboard();
+
+  res.json(players);
 });
 
-app.post("/admin/reset", (req, res) => {
+/*
+  FULL RESET
+*/
+app.post("/admin/reset", async (req, res) => {
   const secret = req.headers["x-admin-secret"];
 
   if (secret !== ADMIN_SECRET) {
@@ -98,20 +83,31 @@ app.post("/admin/reset", (req, res) => {
     });
   }
 
-  players = [];
-  saveLeaderboard();
+  const { error } = await supabase
+    .from("leaderboard")
+    .delete()
+    .neq("username", "");
 
-  broadcastLeaderboard();
+  if (error) {
+    console.error(error);
 
-  console.log("Leaderboard fully reset");
+    return res.status(500).json({
+      error: "Failed to reset leaderboard",
+    });
+  }
+
+  await broadcastLeaderboard();
 
   res.json({
     success: true,
-    message: "Leaderboard fully reset. All test scores were deleted.",
+    message: "Leaderboard fully reset",
   });
 });
 
-app.post("/admin/new-week", (req, res) => {
+/*
+  START NEW WEEK
+*/
+app.post("/admin/new-week", async (req, res) => {
   const secret = req.headers["x-admin-secret"];
 
   if (secret !== ADMIN_SECRET) {
@@ -120,28 +116,37 @@ app.post("/admin/new-week", (req, res) => {
     });
   }
 
-  players = players.map((player) => ({
-    ...player,
-    submitted: false,
-    completionTime: 0,
-    lastWeeklyScore: 0,
-  }));
+  const players = await getLeaderboard();
 
-  saveLeaderboard();
-  broadcastLeaderboard();
+  for (const player of players) {
+    await supabase
+      .from("leaderboard")
+      .update({
+        submitted: false,
+        completion_time: 0,
+        last_weekly_score: 0,
+      })
+      .eq("username", player.username);
+  }
 
-  console.log("New weekly event started. Total scores preserved.");
+  await broadcastLeaderboard();
 
   res.json({
     success: true,
     message:
-      "New weekly event started. Total scores were preserved and players can play again.",
+      "New weekly event started. Total scores preserved.",
   });
 });
 
-async function submitToGenLayer(username, score, completionTime) {
+async function submitToGenLayer(
+  username,
+  score,
+  completionTime
+) {
   try {
-    console.log("Submitting score to GenLayer...");
+    console.log(
+      "Submitting score to GenLayer..."
+    );
 
     console.log({
       username,
@@ -151,7 +156,8 @@ async function submitToGenLayer(username, score, completionTime) {
 
     return true;
   } catch (error) {
-    console.error("GenLayer submission failed:", error);
+    console.error(error);
+
     return false;
   }
 }
@@ -159,75 +165,103 @@ async function submitToGenLayer(username, score, completionTime) {
 io.on("connection", (socket) => {
   console.log("User connected");
 
-  socket.emit("gameState", {
-    players: sortPlayers(players),
-  });
+  broadcastLeaderboard();
 
   socket.on("joinRoom", (username) => {
-    if (!username) return;
-
     connectedUsers.set(socket.id, username);
 
-    socket.emit("gameState", {
-      players: sortPlayers(players),
-    });
-
-    console.log(`${username} connected but not added to leaderboard yet`);
+    console.log(
+      `${username} connected`
+    );
   });
 
-  socket.on("submitFinalScore", async ({ finalScore, completionTime }) => {
-    const username = connectedUsers.get(socket.id);
+  socket.on(
+    "submitFinalScore",
+    async ({
+      finalScore,
+      completionTime,
+    }) => {
+      const username =
+        connectedUsers.get(socket.id);
 
-    if (!username) {
-      console.log("Score rejected: no username connected");
-      return;
-    }
+      if (!username) {
+        return;
+      }
 
-    const weeklyScore = Number(finalScore || 0);
-    const timeTaken = Number(completionTime || 0);
+      const weeklyScore =
+        Number(finalScore || 0);
 
-    if (weeklyScore <= 0) {
-      console.log("Score rejected: score is zero");
-      return;
-    }
+      const timeTaken =
+        Number(completionTime || 0);
 
-    let player = players.find((p) => p.name === username);
+      if (weeklyScore <= 0) {
+        return;
+      }
 
-    if (player && player.submitted) {
-      console.log("Replay attempt blocked");
-      return;
-    }
+      const { data: existingPlayer } =
+        await supabase
+          .from("leaderboard")
+          .select("*")
+          .eq("username", username)
+          .single();
 
-    if (!player) {
-      player = {
-        name: username,
-        score: 0,
-        lastWeeklyScore: 0,
-        submitted: false,
-        completionTime: 0,
+      /*
+        BLOCK REPLAY
+      */
+
+      if (
+        existingPlayer &&
+        existingPlayer.submitted
+      ) {
+        console.log(
+          "Replay blocked"
+        );
+
+        return;
+      }
+
+      const updatedScore =
+        Number(
+          existingPlayer?.total_score || 0
+        ) + weeklyScore;
+
+      const payload = {
+        username,
+        total_score: updatedScore,
+        last_weekly_score:
+          weeklyScore,
+        submitted: true,
+        completion_time:
+          timeTaken,
       };
 
-      players.push(player);
+      await supabase
+        .from("leaderboard")
+        .upsert(payload, {
+          onConflict: "username",
+        });
+
+      await submitToGenLayer(
+        username,
+        weeklyScore,
+        timeTaken
+      );
+
+      await broadcastLeaderboard();
     }
-
-    player.score = Number(player.score || 0) + weeklyScore;
-    player.lastWeeklyScore = weeklyScore;
-    player.submitted = true;
-    player.completionTime = timeTaken;
-
-    saveLeaderboard();
-
-    await submitToGenLayer(username, weeklyScore, timeTaken);
-
-    broadcastLeaderboard();
-  });
+  );
 
   socket.on("disconnect", () => {
     connectedUsers.delete(socket.id);
-    console.log("User disconnected");
+
+    console.log(
+      "User disconnected"
+    );
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(
+    `Server running on port ${PORT}`
+  );
 });
