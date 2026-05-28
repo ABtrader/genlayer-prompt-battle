@@ -31,15 +31,12 @@ export default function App() {
   const [gameStarted, setGameStarted] = useState(false);
   const [username, setUsername] = useState("");
   const [challengeIndex, setChallengeIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] =
-    useState<number | null>(null);
-
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [timeLeft, setTimeLeft] =
-    useState(GAME_DURATION);
+  const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
 
   const roomId = "GL-WEEKLY-ARENA";
 
@@ -55,7 +52,6 @@ export default function App() {
       ],
       correct: 0,
     },
-
     {
       title: "Question 2: Optimistic Democracy",
       question:
@@ -67,7 +63,6 @@ export default function App() {
       ],
       correct: 1,
     },
-
     {
       title: "Question 3: AI Validators",
       question:
@@ -79,7 +74,6 @@ export default function App() {
       ],
       correct: 0,
     },
-
     {
       title: "Question 4: Trustless Adjudication",
       question:
@@ -91,7 +85,6 @@ export default function App() {
       ],
       correct: 2,
     },
-
     {
       title: "Question 5: Subjective Judging",
       question:
@@ -103,7 +96,6 @@ export default function App() {
       ],
       correct: 0,
     },
-
     {
       title: "Question 6: Natural Language",
       question:
@@ -115,7 +107,6 @@ export default function App() {
       ],
       correct: 0,
     },
-
     {
       title: "Question 7: Community XP",
       question:
@@ -127,7 +118,6 @@ export default function App() {
       ],
       correct: 2,
     },
-
     {
       title: "Question 8: Multiplayer Use Case",
       question:
@@ -139,7 +129,6 @@ export default function App() {
       ],
       correct: 0,
     },
-
     {
       title: "Question 9: Consensus",
       question:
@@ -151,7 +140,6 @@ export default function App() {
       ],
       correct: 1,
     },
-
     {
       title: "Question 10: Final GenLayer Round",
       question:
@@ -163,18 +151,179 @@ export default function App() {
       ],
       correct: 2,
     },
+    {
+      title: "Question 11: GenLayer Leadership",
+      question:
+        "Who is the co-founder and CTO of GenLayer?",
+      options: [
+        "Ivan Raskovsky",
+        "Vitalik Buterin",
+        "Satoshi Nakamoto",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 12: Core Technology",
+      question:
+        "What is at the heart of GenLayer’s core technology?",
+      options: [
+        "Optimistic Democracy.",
+        "Proof of Work mining.",
+        "Centralized API approval.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 13: Consensus Design",
+      question:
+        "Optimistic Democracy is described as an enhanced version of which consensus mechanism?",
+      options: [
+        "Delegated Proof of Stake.",
+        "Proof of History.",
+        "Proof of Storage.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 14: On-Chain AI Processing",
+      question:
+        "What does on-chain AI processing allow GenLayer validators to do?",
+      options: [
+        "Connect to AI models for reasoning, natural language understanding, and predictions.",
+        "Only send ETH between wallets.",
+        "Disable smart contracts completely.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 15: AI Model Integration",
+      question:
+        "Which type of external systems can GenLayer validators connect to for complex reasoning?",
+      options: [
+        "Large Language Models and AI services.",
+        "Only image storage servers.",
+        "Only normal calculator apps.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 16: Consensus-Backed Security",
+      question:
+        "Why do multiple validators vote on GenLayer outcomes?",
+      options: [
+        "To provide collective agreement and reliability.",
+        "To hide every result from users.",
+        "To make one validator control the network.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 17: Intelligent Contract Ability",
+      question:
+        "What ability do Intelligent Contracts gain in GenLayer?",
+      options: [
+        "They can understand natural language, process real-world data, and adapt to conditions.",
+        "They can only store static text.",
+        "They can only create profile pictures.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 18: Validator Software",
+      question:
+        "What does GenLayer validator software handle?",
+      options: [
+        "Networking, block production, and transaction management.",
+        "Only website design.",
+        "Only social media login.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 19: Deterministic Transactions",
+      question:
+        "What are deterministic transactions in the GenLayer validator framework?",
+      options: [
+        "Typical blockchain transactions with predictable results.",
+        "Random AI guesses with no verification.",
+        "Transactions that cannot be checked.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 20: Non-Deterministic Transactions",
+      question:
+        "What are non-deterministic transactions in GenLayer?",
+      options: [
+        "Transactions that use AI-driven logic like searching data, reasoning, or making inferences.",
+        "Transactions that only transfer fixed token balances.",
+        "Transactions that always fail automatically.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 21: GenLayer Network Layers",
+      question:
+        "GenLayer operates with which two main layers?",
+      options: [
+        "GenLayer RPC and GenLayer Chain.",
+        "Bitcoin Layer and Filecoin Layer.",
+        "Frontend Layer and CSS Layer only.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 22: GenLayer RPC",
+      question:
+        "What does the GenLayer RPC mainly handle?",
+      options: [
+        "Intelligent Contract operations using gen_* methods.",
+        "Only image rendering.",
+        "Only Discord username storage.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 23: GenLayer Chain",
+      question:
+        "What is the GenLayer Chain responsible for?",
+      options: [
+        "Standard Ethereum operations through the underlying L2.",
+        "Writing social media posts.",
+        "Replacing all wallets.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 24: App Architecture",
+      question:
+        "In a common GenLayer app, what does the frontend or backend usually do?",
+      options: [
+        "Collect user intent, display data, handle indexing, and prepare evidence.",
+        "Own every consensus-critical decision alone.",
+        "Replace validators completely.",
+      ],
+      correct: 0,
+    },
+    {
+      title: "Question 25: Validator Verification",
+      question:
+        "What do GenLayer validators do in the common architecture pattern?",
+      options: [
+        "They independently verify the leader’s result using evidence and the equivalence principle.",
+        "They randomly choose winners without checking evidence.",
+        "They only change page colors.",
+      ],
+      correct: 0,
+    },
   ];
 
-  const currentChallenge =
-    challenges[challengeIndex];
+  const currentChallenge = challenges[challengeIndex];
 
   useEffect(() => {
-    socket.on(
-      "gameState",
-      (data: { players?: Player[] }) => {
-        setPlayers(data.players || []);
-      }
-    );
+    socket.on("gameState", (data: { players?: Player[] }) => {
+      setPlayers(data.players || []);
+    });
 
     return () => {
       socket.off("gameState");
@@ -186,8 +335,7 @@ export default function App() {
       window.location.hash.replace("#", "?")
     );
 
-    const accessToken =
-      params.get("access_token");
+    const accessToken = params.get("access_token");
 
     if (accessToken) {
       fetch("https://discord.com/api/users/@me", {
@@ -196,54 +344,34 @@ export default function App() {
         },
       })
         .then((res) => res.json())
-        .then(
-          (user: { username?: string }) => {
-            if (user.username) {
-              setUsername(user.username);
+        .then((user: { username?: string }) => {
+          if (user.username) {
+            setUsername(user.username);
 
-              socket.emit(
-                "joinRoom",
-                user.username
-              );
+            socket.emit("joinRoom", user.username);
 
-              setJoined(true);
+            setJoined(true);
 
-              window.history.replaceState(
-                {},
-                document.title,
-                "/"
-              );
-            }
+            window.history.replaceState({}, document.title, "/");
           }
-        );
+        });
     }
   }, []);
 
   useEffect(() => {
-    if (
-      joined &&
-      gameStarted &&
-      timeLeft > 0 &&
-      !finished
-    ) {
+    if (joined && gameStarted && timeLeft > 0 && !finished) {
       const timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
 
       return () => clearInterval(timer);
     }
-  }, [
-    joined,
-    gameStarted,
-    timeLeft,
-    finished,
-  ]);
+  }, [joined, gameStarted, timeLeft, finished]);
 
   const loginWithDiscord = () => {
-    const redirectUri =
-      encodeURIComponent(
-        "https://genlayer-prompt-battle.vercel.app"
-      );
+    const redirectUri = encodeURIComponent(
+      "https://genlayer-prompt-battle.vercel.app"
+    );
 
     window.location.href =
       `https://discord.com/oauth2/authorize` +
@@ -256,9 +384,7 @@ export default function App() {
   const handleSubmit = () => {
     if (selectedAnswer === null) return;
 
-    if (
-      selectedAnswer === currentChallenge.correct
-    ) {
+    if (selectedAnswer === currentChallenge.correct) {
       setScore((prev) => prev + 10);
     }
 
@@ -266,10 +392,7 @@ export default function App() {
   };
 
   const nextQuestion = () => {
-    if (
-      challengeIndex + 1 <
-      challenges.length
-    ) {
+    if (challengeIndex + 1 < challenges.length) {
       setChallengeIndex((prev) => prev + 1);
 
       setSelectedAnswer(null);
@@ -280,22 +403,15 @@ export default function App() {
     }
 
     const finalScore =
-      selectedAnswer ===
-      currentChallenge.correct
-        ? score + 10
-        : score;
+      selectedAnswer === currentChallenge.correct ? score + 10 : score;
 
-    const completionTime =
-      GAME_DURATION - timeLeft;
+    const completionTime = GAME_DURATION - timeLeft;
 
     setScore(finalScore);
 
     setFinished(true);
 
-    console.log(
-      "Submitting to GenLayer contract:",
-      GENLAYER_CONTRACT
-    );
+    console.log("Submitting to GenLayer contract:", GENLAYER_CONTRACT);
 
     socket.emit("submitFinalScore", {
       finalScore,
@@ -303,21 +419,13 @@ export default function App() {
     });
   };
 
-  const leaderboard = [...players].sort(
-    (a, b) => {
-      if (b.score !== a.score)
-        return b.score - a.score;
+  const leaderboard = [...players].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
 
-      return (
-        a.completionTime -
-        b.completionTime
-      );
-    }
-  );
+    return a.completionTime - b.completionTime;
+  });
 
-  const minutes = Math.floor(
-    timeLeft / 60
-  );
+  const minutes = Math.floor(timeLeft / 60);
 
   const seconds = timeLeft % 60;
 
@@ -334,83 +442,50 @@ export default function App() {
           <h2>Join With Discord</h2>
 
           <p className="footer">
-            Connect your Discord account to
-            enter the weekly GenLayer arena.
+            Connect your Discord account to enter the weekly GenLayer arena.
           </p>
 
-          <button
-            onClick={loginWithDiscord}
-          >
+          <button onClick={loginWithDiscord}>
             Continue with Discord
           </button>
         </div>
       ) : !gameStarted ? (
         <div className="card">
-          <h2>
-            Welcome, {username} 👋
-          </h2>
+          <h2>Welcome, {username} 👋</h2>
 
           <div className="question">
             <p>
-              GenLayer is a Web3 protocol
-              focused on Intelligent
-              Contracts, AI-powered
-              reasoning, and trustless
-              adjudication.
+              GenLayer is a Web3 protocol focused on Intelligent Contracts,
+              AI-powered reasoning, and trustless adjudication.
             </p>
 
             <p>
-              This game now includes a
-              deployed GenLayer Intelligent
-              Contract for score tracking.
+              This game now includes a deployed GenLayer Intelligent Contract
+              for score tracking.
             </p>
 
             <h3>Game Rules</h3>
 
-            <p>
-              • You will answer 10
-              GenLayer-focused questions.
-            </p>
+            <p>• You will answer 25 GenLayer-focused questions.</p>
 
-            <p>
-              • You have 5 minutes to
-              complete the game.
-            </p>
+            <p>• You have 5 minutes to complete the game.</p>
 
-            <p>
-              • Each correct answer gives
-              10 XP.
-            </p>
+            <p>• Each correct answer gives 10 XP.</p>
 
-            <p>
-              • Incorrect answers give 0
-              score.
-            </p>
+            <p>• Incorrect answers give 0 score.</p>
 
-            <p>
-              • Same score = faster
-              completion time ranks higher.
-            </p>
+            <p>• Maximum possible score is 250 XP.</p>
 
-            <p>
-              • Results are connected to a
-              deployed GenLayer contract.
-            </p>
+            <p>• Same score = faster completion time ranks higher.</p>
 
-            <p>
-              Contract Address:
-            </p>
+            <p>• Results are connected to a deployed GenLayer contract.</p>
 
-            <p>
-              {GENLAYER_CONTRACT}
-            </p>
+            <p>Contract Address:</p>
+
+            <p>{GENLAYER_CONTRACT}</p>
           </div>
 
-          <button
-            onClick={() =>
-              setGameStarted(true)
-            }
-          >
+          <button onClick={() => setGameStarted(true)}>
             PLAY
           </button>
         </div>
@@ -419,48 +494,36 @@ export default function App() {
           <h2>🏆 Final Leaderboard</h2>
 
           <p className="footer">
-            Your Final Score: {score}
+            Your Final Score: {score} / 250
           </p>
 
           <div className="leaderboard">
-            {leaderboard.map(
-              (player, index) => (
-                <div
-                  key={player.id}
-                  className={`player ${
-                    player.name ===
-                    username
-                      ? "highlight"
-                      : ""
-                  }`}
-                >
-                  <span>
-                    #{index + 1}{" "}
-                    {player.name}
-                  </span>
+            {leaderboard.map((player, index) => (
+              <div
+                key={player.id}
+                className={`player ${
+                  player.name === username ? "highlight" : ""
+                }`}
+              >
+                <span>
+                  #{index + 1} {player.name}
+                </span>
 
-                  <span>
-                    {player.score}
-                    {player.submitted &&
-                      ` • ${player.completionTime}s`}
-                  </span>
-                </div>
-              )
-            )}
+                <span>
+                  {player.score} / 250
+                  {player.submitted && ` • ${player.completionTime}s`}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       ) : (
         <div className="card">
           <div className="topbar">
-            <span>
-              Room: {roomId}
-            </span>
+            <span>Room: {roomId}</span>
 
             <span>
-              ⏱ {minutes}:
-              {seconds < 10
-                ? `0${seconds}`
-                : seconds}
+              ⏱ {minutes}:{seconds < 10 ? `0${seconds}` : seconds}
             </span>
           </div>
 
@@ -469,72 +532,47 @@ export default function App() {
           </p>
 
           <p className="footer">
-            Question{" "}
-            {challengeIndex + 1} / 10
+            Question {challengeIndex + 1} / {challenges.length}
           </p>
 
           <p className="footer">
-            Current Score: {score}
+            Current Score: {score} / 250
           </p>
 
-          <h2>
-            {currentChallenge.title}
-          </h2>
+          <h2>{currentChallenge.title}</h2>
 
           <div className="question">
-            <p>
-              {
-                currentChallenge.question
-              }
-            </p>
+            <p>{currentChallenge.question}</p>
 
-            {currentChallenge.options.map(
-              (option, index) => (
-                <label key={index}>
-                  <input
-                    type="radio"
-                    name="answer"
-                    checked={
-                      selectedAnswer ===
-                      index
-                    }
-                    onChange={() =>
-                      setSelectedAnswer(
-                        index
-                      )
-                    }
-                    disabled={submitted}
-                  />
+            {currentChallenge.options.map((option, index) => (
+              <label key={index}>
+                <input
+                  type="radio"
+                  name="answer"
+                  checked={selectedAnswer === index}
+                  onChange={() => setSelectedAnswer(index)}
+                  disabled={submitted}
+                />
 
-                  {String.fromCharCode(
-                    65 + index
-                  )}
-                  . {option}
-                </label>
-              )
-            )}
+                {String.fromCharCode(65 + index)}. {option}
+              </label>
+            ))}
           </div>
 
           {!submitted ? (
-            <button
-              onClick={handleSubmit}
-            >
+            <button onClick={handleSubmit}>
               Submit Answer
             </button>
           ) : (
             <>
               <p className="footer">
-                {selectedAnswer ===
-                currentChallenge.correct
+                {selectedAnswer === currentChallenge.correct
                   ? "✅ Correct Answer"
                   : "❌ Incorrect Answer"}
               </p>
 
-              <button
-                onClick={nextQuestion}
-              >
-                {challengeIndex + 1 ===
-                challenges.length
+              <button onClick={nextQuestion}>
+                {challengeIndex + 1 === challenges.length
                   ? "Finish Game"
                   : "Next Question"}
               </button>
