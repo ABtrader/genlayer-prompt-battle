@@ -27,30 +27,23 @@ const leaderboardFile = path.join(
 
 let players = [];
 
-function loadLeaderboard() {
-  try {
-    if (fs.existsSync(leaderboardFile)) {
-      const data = fs.readFileSync(
-        leaderboardFile,
-        "utf-8"
-      );
+/*
+  FORCE CLEAN START
+*/
 
-      players = JSON.parse(data);
+try {
+  fs.writeFileSync(
+    leaderboardFile,
+    JSON.stringify([], null, 2)
+  );
 
-      if (!Array.isArray(players)) {
-        players = [];
-      }
-    } else {
-      players = [];
-    }
-  } catch (error) {
-    console.error(
-      "Error loading leaderboard:",
-      error
-    );
+  players = [];
 
-    players = [];
-  }
+  console.log(
+    "Leaderboard initialized clean"
+  );
+} catch (error) {
+  console.log(error);
 }
 
 function saveLeaderboard() {
@@ -59,8 +52,6 @@ function saveLeaderboard() {
     JSON.stringify(players, null, 2)
   );
 }
-
-loadLeaderboard();
 
 app.get("/", (req, res) => {
   res.send(
@@ -83,21 +74,10 @@ app.post("/admin/reset", (req, res) => {
 
   players = [];
 
-  try {
-    if (fs.existsSync(leaderboardFile)) {
-      fs.unlinkSync(leaderboardFile);
-    }
-
-    fs.writeFileSync(
-      leaderboardFile,
-      JSON.stringify([], null, 2)
-    );
-  } catch (error) {
-    console.error(
-      "Error resetting leaderboard:",
-      error
-    );
-  }
+  fs.writeFileSync(
+    leaderboardFile,
+    JSON.stringify([], null, 2)
+  );
 
   io.emit("gameState", {
     players: [],
@@ -131,10 +111,7 @@ async function submitToGenLayer(
 
     return true;
   } catch (error) {
-    console.error(
-      "GenLayer submission failed:",
-      error
-    );
+    console.error(error);
 
     return false;
   }
@@ -150,15 +127,13 @@ io.on("connection", (socket) => {
   socket.on(
     "joinRoom",
     (username) => {
-      const existingPlayerIndex =
-        players.findIndex(
+      const existingPlayer =
+        players.find(
           (player) =>
             player.name === username
         );
 
-      if (
-        existingPlayerIndex === -1
-      ) {
+      if (!existingPlayer) {
         players.push({
           id: socket.id,
           name: username,
@@ -166,13 +141,9 @@ io.on("connection", (socket) => {
           submitted: false,
           completionTime: 0,
         });
-      } else {
-        players[
-          existingPlayerIndex
-        ].id = socket.id;
-      }
 
-      saveLeaderboard();
+        saveLeaderboard();
+      }
 
       io.emit("gameState", {
         players,
@@ -195,10 +166,6 @@ io.on("connection", (socket) => {
       if (!player) return;
 
       if (player.submitted) {
-        console.log(
-          "Player already submitted"
-        );
-
         return;
       }
 
