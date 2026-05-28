@@ -28,13 +28,28 @@ const leaderboardFile = path.join(
 let players = [];
 
 function loadLeaderboard() {
-  if (fs.existsSync(leaderboardFile)) {
-    const data = fs.readFileSync(
-      leaderboardFile,
-      "utf-8"
+  try {
+    if (fs.existsSync(leaderboardFile)) {
+      const data = fs.readFileSync(
+        leaderboardFile,
+        "utf-8"
+      );
+
+      players = JSON.parse(data);
+
+      if (!Array.isArray(players)) {
+        players = [];
+      }
+    } else {
+      players = [];
+    }
+  } catch (error) {
+    console.error(
+      "Error loading leaderboard:",
+      error
     );
 
-    players = JSON.parse(data);
+    players = [];
   }
 }
 
@@ -48,7 +63,9 @@ function saveLeaderboard() {
 loadLeaderboard();
 
 app.get("/", (req, res) => {
-  res.send("GenLayer Prompt Battle Backend Live");
+  res.send(
+    "GenLayer Prompt Battle Backend Live"
+  );
 });
 
 app.get("/leaderboard", (req, res) => {
@@ -66,13 +83,33 @@ app.post("/admin/reset", (req, res) => {
 
   players = [];
 
-  saveLeaderboard();
+  try {
+    if (fs.existsSync(leaderboardFile)) {
+      fs.unlinkSync(leaderboardFile);
+    }
 
-  io.emit("gameState", { players });
+    fs.writeFileSync(
+      leaderboardFile,
+      JSON.stringify([], null, 2)
+    );
+  } catch (error) {
+    console.error(
+      "Error resetting leaderboard:",
+      error
+    );
+  }
+
+  io.emit("gameState", {
+    players: [],
+  });
+
+  console.log(
+    "Leaderboard fully reset"
+  );
 
   res.json({
     success: true,
-    message: "Leaderboard reset successfully",
+    message: "Leaderboard fully reset",
   });
 });
 
@@ -92,18 +129,6 @@ async function submitToGenLayer(
       completionTime,
     });
 
-    /*
-      FUTURE REAL RPC INTEGRATION AREA
-
-      This is where real GenLayer RPC calls
-      will happen later.
-
-      Current MVP:
-      - Backend logs all score submissions
-      - Keeps structure ready for actual
-        GenLayer transaction integration
-    */
-
     return true;
   } catch (error) {
     console.error(
@@ -122,27 +147,38 @@ io.on("connection", (socket) => {
     players,
   });
 
-  socket.on("joinRoom", (username) => {
-    const existingPlayer = players.find(
-      (player) => player.name === username
-    );
+  socket.on(
+    "joinRoom",
+    (username) => {
+      const existingPlayerIndex =
+        players.findIndex(
+          (player) =>
+            player.name === username
+        );
 
-    if (!existingPlayer) {
-      players.push({
-        id: socket.id,
-        name: username,
-        score: 0,
-        submitted: false,
-        completionTime: 0,
-      });
+      if (
+        existingPlayerIndex === -1
+      ) {
+        players.push({
+          id: socket.id,
+          name: username,
+          score: 0,
+          submitted: false,
+          completionTime: 0,
+        });
+      } else {
+        players[
+          existingPlayerIndex
+        ].id = socket.id;
+      }
 
       saveLeaderboard();
-    }
 
-    io.emit("gameState", {
-      players,
-    });
-  });
+      io.emit("gameState", {
+        players,
+      });
+    }
+  );
 
   socket.on(
     "submitFinalScore",
@@ -150,9 +186,11 @@ io.on("connection", (socket) => {
       finalScore,
       completionTime,
     }) => {
-      const player = players.find(
-        (p) => p.id === socket.id
-      );
+      const player =
+        players.find(
+          (p) =>
+            p.id === socket.id
+        );
 
       if (!player) return;
 
@@ -185,9 +223,14 @@ io.on("connection", (socket) => {
     }
   );
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected");
-  });
+  socket.on(
+    "disconnect",
+    () => {
+      console.log(
+        "User disconnected"
+      );
+    }
+  );
 });
 
 server.listen(PORT, () => {
