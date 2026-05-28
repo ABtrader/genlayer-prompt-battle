@@ -21,7 +21,6 @@ const socket = io("https://genlayer-prompt-battle.onrender.com");
 const CLIENT_ID = "1509214466540044298";
 const GAME_DURATION = 300;
 const MAX_SCORE = 250;
-
 const GENLAYER_CONTRACT = import.meta.env.VITE_GENLAYER_CONTRACT_ADDRESS;
 
 export default function App() {
@@ -313,6 +312,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const savedUsername = localStorage.getItem("discord_username");
+
+    if (savedUsername) {
+      setUsername(savedUsername);
+      socket.emit("joinRoom", savedUsername);
+      setJoined(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.hash.replace("#", "?"));
     const accessToken = params.get("access_token");
 
@@ -325,6 +334,7 @@ export default function App() {
         .then((res) => res.json())
         .then((user: { username?: string }) => {
           if (user.username) {
+            localStorage.setItem("discord_username", user.username);
             setUsername(user.username);
             socket.emit("joinRoom", user.username);
             setJoined(true);
@@ -355,6 +365,21 @@ export default function App() {
       `&response_type=token` +
       `&redirect_uri=${redirectUri}` +
       `&scope=identify`;
+  };
+
+  const disconnectDiscord = () => {
+    localStorage.removeItem("discord_username");
+    setJoined(false);
+    setGameStarted(false);
+    setShowLeaderboard(false);
+    setUsername("");
+    setChallengeIndex(0);
+    setSelectedAnswer(null);
+    setSubmitted(false);
+    setScore(0);
+    setFinished(false);
+    setTimeLeft(GAME_DURATION);
+    setParticipationMessage("");
   };
 
   const startGame = () => {
@@ -416,7 +441,8 @@ export default function App() {
       <h2>🏆 Live Leaderboard</h2>
 
       <p className="footer">
-        Ranking is based on score first. If scores are tied, faster completion time ranks higher.
+        Ranking is based on score first. If scores are tied, faster completion
+        time ranks higher.
       </p>
 
       <div className="leaderboard">
@@ -461,6 +487,10 @@ export default function App() {
             <button onClick={() => setShowLeaderboard(true)}>
               Leaderboard
             </button>
+
+            <button onClick={disconnectDiscord}>
+              Disconnect
+            </button>
           </div>
         </div>
       )}
@@ -483,9 +513,7 @@ export default function App() {
 
           {hasAlreadyParticipated && (
             <div className="question">
-              <p>
-                You have already participated in this weekly game event.
-              </p>
+              <p>You have already participated in this weekly game event.</p>
 
               <p>
                 Your recorded score is {currentPlayer?.score} / {MAX_SCORE}
@@ -495,7 +523,8 @@ export default function App() {
               </p>
 
               <p>
-                You can check the live leaderboard, but you cannot replay this weekly event.
+                You can check the live leaderboard, but you cannot replay this
+                weekly event.
               </p>
             </div>
           )}
@@ -513,7 +542,8 @@ export default function App() {
             </p>
 
             <p>
-              This game includes a deployed GenLayer Intelligent Contract for score tracking.
+              This game includes a deployed GenLayer Intelligent Contract for
+              score tracking.
             </p>
 
             <h3>Game Rules</h3>
