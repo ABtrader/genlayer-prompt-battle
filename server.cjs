@@ -8,16 +8,13 @@ const { createClient } = require("@supabase/supabase-js");
 dotenv.config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-  },
+  cors: { origin: "*" },
 });
 
 const PORT = process.env.PORT || 3001;
@@ -25,18 +22,30 @@ const ADMIN_SECRET = "change-this-before-live";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
 
 const connectedUsers = new Map();
 
-function sortPlayers(list) {
-  return [...list].sort((a, b) => {
-    if (b.total_score !== a.total_score) {
-      return b.total_score - a.total_score;
-    }
+function formatPlayer(row) {
+  return {
+    id: String(row.id || row.username),
+    name: row.username,
+    score: Number(row.total_score || 0),
+    lastWeeklyScore: Number(row.last_weekly_score || 0),
+    submitted: Boolean(row.submitted),
+    completionTime: Number(row.completion_time || 0),
+  };
+}
 
-    return a.completion_time - b.completion_time;
+function sortPlayers(players) {
+  return [...players].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+
+    const aTime = a.completionTime || 999999;
+    const bTime = b.completionTime || 999999;
+
+    return aTime - bTime;
   });
 }
 
@@ -46,19 +55,17 @@ async function getLeaderboard() {
     .select("*");
 
   if (error) {
-    console.error(error);
+    console.error("Leaderboard fetch error:", error);
     return [];
   }
 
-  return sortPlayers(data || []);
+  return sortPlayers((data || []).map(formatPlayer));
 }
 
 async function broadcastLeaderboard() {
   const players = await getLeaderboard();
 
-  io.emit("gameState", {
-    players,
-  });
+  io.emit("gameState", { players });
 }
 
 app.get("/", (req, res) => {
@@ -67,20 +74,14 @@ app.get("/", (req, res) => {
 
 app.get("/leaderboard", async (req, res) => {
   const players = await getLeaderboard();
-
   res.json(players);
 });
 
-/*
-  FULL RESET
-*/
 app.post("/admin/reset", async (req, res) => {
   const secret = req.headers["x-admin-secret"];
 
   if (secret !== ADMIN_SECRET) {
-    return res.status(401).json({
-      error: "Unauthorized",
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const { error } = await supabase
@@ -89,11 +90,8 @@ app.post("/admin/reset", async (req, res) => {
     .neq("username", "");
 
   if (error) {
-    console.error(error);
-
-    return res.status(500).json({
-      error: "Failed to reset leaderboard",
-    });
+    console.error("Reset error:", error);
+    return res.status(500).json({ error: "Failed to reset leaderboard" });
   }
 
   await broadcastLeaderboard();
@@ -104,62 +102,39 @@ app.post("/admin/reset", async (req, res) => {
   });
 });
 
-/*
-  START NEW WEEK
-*/
 app.post("/admin/new-week", async (req, res) => {
   const secret = req.headers["x-admin-secret"];
 
   if (secret !== ADMIN_SECRET) {
-    return res.status(401).json({
-      error: "Unauthorized",
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const players = await getLeaderboard();
+  const { error } = await supabase
+    .from("leaderboard")
+    .update({
+      submitted: false,
+      completion_time: 0,
+      last_weekly_score: 0,
+    })
+    .neq("username", "");
 
-  for (const player of players) {
-    await supabase
-      .from("leaderboard")
-      .update({
-        submitted: false,
-        completion_time: 0,
-        last_weekly_score: 0,
-      })
-      .eq("username", player.username);
+  if (error) {
+    console.error("New week error:", error);
+    return res.status(500).json({ error: "Failed to start new week" });
   }
 
   await broadcastLeaderboard();
 
   res.json({
     success: true,
-    message:
-      "New weekly event started. Total scores preserved.",
+    message: "New week started. Total scores preserved.",
   });
 });
 
-async function submitToGenLayer(
-  username,
-  score,
-  completionTime
-) {
-  try {
-    console.log(
-      "Submitting score to GenLayer..."
-    );
-
-    console.log({
-      username,
-      score,
-      completionTime,
-    });
-
-    return true;
-  } catch (error) {
-    console.error(error);
-
-    return false;
-  }
+async function submitToGenLayer(username, score, completionTime) {
+  console.log("Submitting score to GenLayer...");
+  console.log({ username, score, completionTime });
+  return true;
 }
 
 io.on("connection", (socket) => {
@@ -167,101 +142,81 @@ io.on("connection", (socket) => {
 
   broadcastLeaderboard();
 
-  socket.on("joinRoom", (username) => {
+  socket.on("joinRoom", async (username) => {
+    if (!username) return;
+
     connectedUsers.set(socket.id, username);
 
-    console.log(
-      `${username} connected`
-    );
+    console.log(`${username} connected`);
+
+    await broadcastLeaderboard();
   });
 
-  socket.on(
-    "submitFinalScore",
-    async ({
-      finalScore,
-      completionTime,
-    }) => {
-      const username =
-        connectedUsers.get(socket.id);
+  socket.on("submitFinalScore", async ({ finalScore, completionTime }) => {
+    const username = connectedUsers.get(socket.id);
 
-      if (!username) {
-        return;
-      }
-
-      const weeklyScore =
-        Number(finalScore || 0);
-
-      const timeTaken =
-        Number(completionTime || 0);
-
-      if (weeklyScore <= 0) {
-        return;
-      }
-
-      const { data: existingPlayer } =
-        await supabase
-          .from("leaderboard")
-          .select("*")
-          .eq("username", username)
-          .single();
-
-      /*
-        BLOCK REPLAY
-      */
-
-      if (
-        existingPlayer &&
-        existingPlayer.submitted
-      ) {
-        console.log(
-          "Replay blocked"
-        );
-
-        return;
-      }
-
-      const updatedScore =
-        Number(
-          existingPlayer?.total_score || 0
-        ) + weeklyScore;
-
-      const payload = {
-        username,
-        total_score: updatedScore,
-        last_weekly_score:
-          weeklyScore,
-        submitted: true,
-        completion_time:
-          timeTaken,
-      };
-
-      await supabase
-        .from("leaderboard")
-        .upsert(payload, {
-          onConflict: "username",
-        });
-
-      await submitToGenLayer(
-        username,
-        weeklyScore,
-        timeTaken
-      );
-
-      await broadcastLeaderboard();
+    if (!username) {
+      console.log("No username found for this socket");
+      return;
     }
-  );
+
+    const weeklyScore = Number(finalScore || 0);
+    const timeTaken = Number(completionTime || 0);
+
+    if (weeklyScore <= 0) {
+      console.log("Rejected zero score");
+      return;
+    }
+
+    const { data: existingPlayer, error: fetchError } = await supabase
+      .from("leaderboard")
+      .select("*")
+      .eq("username", username)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("Player fetch error:", fetchError);
+      return;
+    }
+
+    if (existingPlayer?.submitted) {
+      console.log("Replay blocked for:", username);
+      await broadcastLeaderboard();
+      return;
+    }
+
+    const previousTotal = Number(existingPlayer?.total_score || 0);
+    const updatedTotal = previousTotal + weeklyScore;
+
+    const payload = {
+      username,
+      total_score: updatedTotal,
+      last_weekly_score: weeklyScore,
+      submitted: true,
+      completion_time: timeTaken,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: upsertError } = await supabase
+      .from("leaderboard")
+      .upsert(payload, { onConflict: "username" });
+
+    if (upsertError) {
+      console.error("Score save error:", upsertError);
+      return;
+    }
+
+    await submitToGenLayer(username, weeklyScore, timeTaken);
+
+    await broadcastLeaderboard();
+  });
 
   socket.on("disconnect", () => {
     connectedUsers.delete(socket.id);
-
-    console.log(
-      "User disconnected"
-    );
+    console.log("User disconnected");
   });
 });
 
 server.listen(PORT, () => {
-  console.log(
-    `Server running on port ${PORT}`
-  );
+  console.log(`Server running on port ${PORT}`);
 });
