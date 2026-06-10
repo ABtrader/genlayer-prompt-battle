@@ -1,7 +1,8 @@
+```css
 :root {
-  font-family: Arial, sans-serif;
-  color: white;
-  background-color: #0f172a;
+  font-family: Inter, Arial, sans-serif;
+  color: #ffffff;
+  background: #0f172a;
 }
 
 html,
@@ -9,10 +10,148 @@ body,
 #root {
   margin: 0;
   padding: 0;
-  width: 100%;
   min-height: 100vh;
+  width: 100%;
 }
 
 body {
-  background: #0f172a;
+  background:
+    radial-gradient(circle at top left,
+      rgba(124, 58, 237, 0.25),
+      transparent 35%),
+    radial-gradient(circle at top right,
+      rgba(37, 99, 235, 0.25),
+      transparent 35%),
+    #0f172a;
 }
+
+.container {
+  width: 100%;
+  min-height: 100vh;
+  padding: 30px;
+  box-sizing: border-box;
+}
+
+.card {
+  max-width: 1400px;
+  margin: auto;
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px;
+  padding: 30px;
+}
+
+h1 {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #cbd5e1;
+  margin-bottom: 30px;
+}
+
+.question {
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.18),
+    rgba(124, 58, 237, 0.18)
+  );
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 22px;
+  border-radius: 18px;
+  margin-bottom: 20px;
+}
+
+button {
+  width: 100%;
+  border: none;
+  border-radius: 16px;
+  padding: 15px;
+  margin-top: 15px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+
+  background: linear-gradient(
+    135deg,
+    #2563eb,
+    #7c3aed
+  );
+
+  color: white;
+
+  transition: all 0.25s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 30px rgba(37,99,235,.35);
+}
+
+textarea {
+  width: 100%;
+  min-height: 180px;
+  background: #111827;
+  color: white;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.leaderboard {
+  margin-top: 30px;
+}
+
+.player {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  background: rgba(255,255,255,.04);
+
+  border: 1px solid rgba(255,255,255,.05);
+
+  border-radius: 14px;
+
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.highlight {
+  border: 1px solid #2563eb;
+  box-shadow:
+    0 0 0 1px #2563eb;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 35px;
+  color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+}
+```

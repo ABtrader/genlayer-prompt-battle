@@ -1,309 +1,61 @@
-import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
-import "./App.css";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { io, Socket } from "socket.io-client";
+import { createClient } from "genlayer-js";
+import { studionet } from "genlayer-js/chains";
+import { TransactionStatus } from "genlayer-js/types";
+
+const CONTRACT_ADDRESS = "0xa2b82A505C37b344622F5498057Fa6327e988b8c";
+
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://your-render-backend.onrender.com";
+
+const socket: Socket = io(BACKEND_URL);
+
+const PROMPTS = [
+  "Explain Optimistic Democracy to a Web2 gamer.",
+  "Describe a gaming use case for Intelligent Contracts.",
+  "How can subjective AI decisions improve blockchain applications?",
+  "Pitch GenLayer to a game developer in under 50 words.",
+  "Why is AI consensus useful for games?"
+];
 
 type Player = {
   id: string;
   name: string;
   score: number;
-  submitted: boolean;
-  completionTime: number;
 };
-
-type Challenge = {
-  title: string;
-  question: string;
-  options: string[];
-  correct: number;
-};
-
-const socket = io("https://genlayer-prompt-battle.onrender.com");
-const CLIENT_ID = "1509214466540044298";
-const GAME_DURATION = 300;
-const MAX_SCORE = 250;
-const GENLAYER_CONTRACT = import.meta.env.VITE_GENLAYER_CONTRACT_ADDRESS;
 
 export default function App() {
-  const [joined, setJoined] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [username, setUsername] = useState("");
-  const [challengeIndex, setChallengeIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
+  const [showArena, setShowArena] = useState<boolean>(false);
+  const [walletAddress, setWalletAddress] = useState<string>("");
+  const [username, setUsername] = useState<string>("");
+  
+  const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [answer, setAnswer] = useState<string>("");
   const [players, setPlayers] = useState<Player[]>([]);
-  const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
-  const [participationMessage, setParticipationMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  const roomId = "GL-WEEKLY-ARENA";
+  const [txHash, setTxHash] = useState<string>("");
+  const [feedback, setFeedback] = useState<string>("");
+  const [score, setScore] = useState<number | null>(null);
 
-  const challenges: Challenge[] = [
-    {
-      title: "Question 1: Intelligent Contracts",
-      question:
-        "What makes GenLayer Intelligent Contracts different from traditional smart contracts?",
-      options: [
-        "They only transfer tokens between wallets.",
-        "They can reason with AI and evaluate subjective information.",
-        "They are used only for storing images.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 2: Optimistic Democracy",
-      question: "What is the main role of Optimistic Democracy in GenLayer?",
-      options: [
-        "To help validators reach agreement on AI-generated outputs.",
-        "To let one admin decide every result.",
-        "To stop users from joining applications.",
-      ],
-      correct: 0,
-    },
-    {
-      title: "Question 3: AI Validators",
-      question: "Why are AI validators useful in GenLayer?",
-      options: [
-        "They replace all frontend developers.",
-        "They only count button clicks.",
-        "They help judge outcomes that require reasoning and interpretation.",
-      ],
-      correct: 2,
-    },
-    {
-      title: "Question 4: Trustless Adjudication",
-      question: "What does trustless adjudication mean?",
-      options: [
-        "A single host secretly chooses the winner.",
-        "Results can be judged fairly without trusting one central person.",
-        "Players are ranked randomly.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 5: Subjective Judging",
-      question: "Which task best shows GenLayer’s strength?",
-      options: [
-        "Displaying a fixed welcome message.",
-        "Judging creative answers using AI consensus.",
-        "Checking only simple numbers.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 6: Natural Language",
-      question: "Why is natural language useful for Intelligent Contracts?",
-      options: [
-        "It prevents users from writing answers.",
-        "It only works with wallet balances.",
-        "It allows contracts to evaluate human-readable input.",
-      ],
-      correct: 2,
-    },
-    {
-      title: "Question 7: Community XP",
-      question: "What is the fairest way to distribute XP in this game?",
-      options: [
-        "Give XP based on correct answers and completion time.",
-        "Give XP randomly.",
-        "Give all XP to the first player.",
-      ],
-      correct: 0,
-    },
-    {
-      title: "Question 8: Multiplayer Use Case",
-      question: "Why is GenLayer suitable for multiplayer community games?",
-      options: [
-        "It only supports single-player apps.",
-        "It supports fair judging for challenges that are not purely mathematical.",
-        "It removes all game rules.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 9: Consensus",
-      question: "What should happen when AI outputs need validation?",
-      options: [
-        "The game should ignore all answers.",
-        "Only the fastest player should decide.",
-        "Validators should help confirm the most reliable result.",
-      ],
-      correct: 2,
-    },
-    {
-      title: "Question 10: Final GenLayer Round",
-      question: "Which phrase best describes GenLayer’s role in this game?",
-      options: [
-        "An AI-powered coordination layer for fair judgment and consensus.",
-        "A normal frontend styling tool.",
-        "A file storage app.",
-      ],
-      correct: 0,
-    },
-    {
-      title: "Question 11: GenLayer Leadership",
-      question: "Who is the co-founder and CTO of GenLayer?",
-      options: ["Vitalik Buterin", "Ivan Raskovsky", "Satoshi Nakamoto"],
-      correct: 1,
-    },
-    {
-      title: "Question 12: Core Technology",
-      question: "What is at the heart of GenLayer’s core technology?",
-      options: [
-        "Proof of Work mining.",
-        "Centralized API approval.",
-        "Optimistic Democracy.",
-      ],
-      correct: 2,
-    },
-    {
-      title: "Question 13: Consensus Design",
-      question:
-        "Optimistic Democracy is described as an enhanced version of which consensus mechanism?",
-      options: ["Delegated Proof of Stake.", "Proof of History.", "Proof of Storage."],
-      correct: 0,
-    },
-    {
-      title: "Question 14: On-Chain AI Processing",
-      question:
-        "What does on-chain AI processing allow GenLayer validators to do?",
-      options: [
-        "Only send ETH between wallets.",
-        "Connect to AI models for reasoning, natural language understanding, and predictions.",
-        "Disable smart contracts completely.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 15: AI Model Integration",
-      question:
-        "Which type of external systems can GenLayer validators connect to for complex reasoning?",
-      options: [
-        "Only normal calculator apps.",
-        "Only image storage servers.",
-        "Large Language Models and AI services.",
-      ],
-      correct: 2,
-    },
-    {
-      title: "Question 16: Consensus-Backed Security",
-      question: "Why do multiple validators vote on GenLayer outcomes?",
-      options: [
-        "To provide collective agreement and reliability.",
-        "To hide every result from users.",
-        "To make one validator control the network.",
-      ],
-      correct: 0,
-    },
-    {
-      title: "Question 17: Intelligent Contract Ability",
-      question: "What ability do Intelligent Contracts gain in GenLayer?",
-      options: [
-        "They can only store static text.",
-        "They can understand natural language, process real-world data, and adapt to conditions.",
-        "They can only create profile pictures.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 18: Validator Software",
-      question: "What does GenLayer validator software handle?",
-      options: [
-        "Only website design.",
-        "Only social media login.",
-        "Networking, block production, and transaction management.",
-      ],
-      correct: 2,
-    },
-    {
-      title: "Question 19: Deterministic Transactions",
-      question:
-        "What are deterministic transactions in the GenLayer validator framework?",
-      options: [
-        "Random AI guesses with no verification.",
-        "Typical blockchain transactions with predictable results.",
-        "Transactions that cannot be checked.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 20: Non-Deterministic Transactions",
-      question: "What are non-deterministic transactions in GenLayer?",
-      options: [
-        "Transactions that use AI-driven logic like searching data, reasoning, or making inferences.",
-        "Transactions that only transfer fixed token balances.",
-        "Transactions that always fail automatically.",
-      ],
-      correct: 0,
-    },
-    {
-      title: "Question 21: GenLayer Network Layers",
-      question: "GenLayer operates with which two main layers?",
-      options: [
-        "Bitcoin Layer and Filecoin Layer.",
-        "GenLayer RPC and GenLayer Chain.",
-        "Frontend Layer and CSS Layer only.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 22: GenLayer RPC",
-      question: "What does the GenLayer RPC mainly handle?",
-      options: [
-        "Only image rendering.",
-        "Only Discord username storage.",
-        "Intelligent Contract operations using gen_* methods.",
-      ],
-      correct: 2,
-    },
-    {
-      title: "Question 23: GenLayer Chain",
-      question: "What is the GenLayer Chain responsible for?",
-      options: [
-        "Standard Ethereum operations through the underlying L2.",
-        "Writing social media posts.",
-        "Replacing all wallets.",
-      ],
-      correct: 0,
-    },
-    {
-      title: "Question 24: App Architecture",
-      question:
-        "In a common GenLayer app, what does the frontend or backend usually do?",
-      options: [
-        "Own every consensus-critical decision alone.",
-        "Collect user intent, display data, handle indexing, and prepare evidence.",
-        "Replace validators completely.",
-      ],
-      correct: 1,
-    },
-    {
-      title: "Question 25: Validator Verification",
-      question:
-        "What do GenLayer validators do in the common architecture pattern?",
-      options: [
-        "Randomly choose winners without checking evidence.",
-        "Only change page colors.",
-        "Independently verify the leader’s result using evidence and the equivalence principle.",
-      ],
-      correct: 2,
-    },
-  ];
+  const [rawContractOutput, setRawContractOutput] = useState<string>("");
 
-  const currentChallenge = challenges[challengeIndex];
+  const promptText = useMemo(() => {
+    return PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+  }, []);
 
-  const leaderboard = [...players].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.completionTime - b.completionTime;
-  });
-
-  const currentPlayer = players.find((player) => player.name === username);
-  const hasAlreadyParticipated = currentPlayer?.submitted === true;
-
+  // Real-time leaderboard listener loop
   useEffect(() => {
     socket.on("gameState", (data: { players?: Player[] }) => {
-      setPlayers(data.players || []);
+      if (data?.players) {
+        const sortedPlayers = [...data.players].sort((a, b) => b.score - a.score);
+        setPlayers(sortedPlayers);
+      }
     });
 
     return () => {
@@ -311,347 +63,810 @@ export default function App() {
     };
   }, []);
 
+  // Room synchronization whenever the checked identity state shifts
   useEffect(() => {
-    const savedUsername = localStorage.getItem("discord_username");
-
-    if (savedUsername) {
-      setUsername(savedUsername);
-      socket.emit("joinRoom", savedUsername);
-      setJoined(true);
+    if (username) {
+      socket.emit("joinRoom", username);
     }
+  }, [username]);
+
+  // AUTOMATED ACCOUNT & DISCONNECT LISTENER CHAIN
+  useEffect(() => {
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) return;
+
+    const handleAccountsChanged = (accounts: string[]) => {
+      if (accounts.length === 0) {
+        setWalletAddress("");
+        setUsername("");
+        setScore(null);
+        setFeedback("");
+        setTxHash("");
+        setRawContractOutput("");
+      } else {
+        const nextAddress = accounts[0];
+        setWalletAddress(nextAddress);
+        
+        const savedName = localStorage.getItem(`arena_discord_username_${nextAddress.toLowerCase()}`) || "";
+        setUsername(savedName);
+        
+        setScore(null);
+        setFeedback("");
+        setTxHash("");
+        setRawContractOutput("");
+      }
+    };
+
+    ethereum.on("accountsChanged", handleAccountsChanged);
+    
+    ethereum.request({ method: "eth_accounts" })
+      .then(handleAccountsChanged)
+      .catch(console.error);
+
+    return () => {
+      ethereum.removeListener("accountsChanged", handleAccountsChanged);
+    };
   }, []);
 
+  // Dropdown background click tracking
   useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.replace("#", "?"));
-    const accessToken = params.get("access_token");
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-    if (accessToken) {
-      fetch("https://discord.com/api/users/@me", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-        .then((res) => res.json())
-        .then((user: { username?: string }) => {
-          if (user.username) {
-            localStorage.setItem("discord_username", user.username);
-            setUsername(user.username);
-            socket.emit("joinRoom", user.username);
-            setJoined(true);
-            window.history.replaceState({}, document.title, "/");
+  const connectWallet = async (): Promise<void> => {
+    try {
+      const ethereum = (window as any).ethereum;
+      if (!ethereum) {
+        alert("Please install an EVM wallet.");
+        return;
+      }
+
+      const accounts: string[] = await ethereum.request({
+        method: "eth_requestAccounts",
+      });
+
+      const activeAddress = accounts[0];
+      setWalletAddress(activeAddress);
+      
+      const savedName = localStorage.getItem(`arena_discord_username_${activeAddress.toLowerCase()}`) || "";
+      setUsername(savedName);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const connectDiscordIdentity = (): void => {
+    if (!walletAddress) {
+      alert("Connect your wallet first to anchor your identity profile registration.");
+      return;
+    }
+
+    const name = window.prompt("Enter your Discord username");
+    if (!name) return;
+
+    setUsername(name);
+    localStorage.setItem(`arena_discord_username_${walletAddress.toLowerCase()}`, name);
+
+    socket.emit("joinRoom", name);
+  };
+
+  const handleSignOut = () => {
+    setWalletAddress(""); 
+    setUsername(""); 
+    setDropdownOpen(false);
+  };
+
+  const handleGoHome = () => {
+    setShowArena(false);
+    setDropdownOpen(false);
+  };
+
+  const handleEnterArenaClick = () => {
+    if (!walletAddress) {
+      alert("Connect wallet first to access the arena!");
+      return;
+    }
+    setShowArena(true);
+  };
+
+  // EXPLICIT MANUAL DATA REFRESH FUNCTION (FIXED ARGUMENTS & PARSING)
+  const refreshContractState = async (): Promise<void> => {
+    if (!walletAddress) return;
+    try {
+      setIsSyncing(true);
+      setRawContractOutput("Fetching latest storage slots from GenLayer nodes...");
+
+      const client = createClient({
+        chain: studionet,
+        account: walletAddress as `0x${string}`,
+      });
+
+      // Fixed: Swapped functionName to get_result and explicitly passed wallet address
+      const result = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "get_result",
+        args: [walletAddress],
+      });
+
+      const resultString = JSON.stringify(result);
+      setRawContractOutput(resultString);
+
+      let parsedScore = 0;
+      let parsedFeedback = "No result logged yet.";
+
+      if (result && resultString !== "{}" && resultString !== '""') {
+        try {
+          // Unpack Python JSON string mapping format
+          const cleanData = typeof result === "string" ? JSON.parse(result) : result;
+          if (cleanData && typeof cleanData === "object") {
+            if (cleanData.score !== undefined) parsedScore = Number(cleanData.score);
+            if (cleanData.feedback !== undefined) parsedFeedback = String(cleanData.feedback);
           }
-        });
+        } catch (e) {
+          parsedFeedback = String(result);
+        }
+      }
+
+      setScore(parsedScore);
+      setFeedback(parsedFeedback);
+    } catch (err: any) {
+      console.error("Manual sync failed:", err);
+      setRawContractOutput(`Sync Error: ${err?.message || JSON.stringify(err)}`);
+    } finally {
+      setIsSyncing(false);
     }
-  }, []);
-
-  useEffect(() => {
-    if (joined && gameStarted && timeLeft > 0 && !finished) {
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [joined, gameStarted, timeLeft, finished]);
-
-  const loginWithDiscord = () => {
-    const redirectUri = encodeURIComponent(
-      "https://genlayer-prompt-battle.vercel.app"
-    );
-
-    window.location.href =
-      `https://discord.com/oauth2/authorize` +
-      `?client_id=${CLIENT_ID}` +
-      `&response_type=token` +
-      `&redirect_uri=${redirectUri}` +
-      `&scope=identify`;
   };
 
-  const disconnectDiscord = () => {
-    localStorage.removeItem("discord_username");
-    setJoined(false);
-    setGameStarted(false);
-    setShowLeaderboard(false);
-    setUsername("");
-    setChallengeIndex(0);
-    setSelectedAnswer(null);
-    setSubmitted(false);
-    setScore(0);
-    setFinished(false);
-    setTimeLeft(GAME_DURATION);
-    setParticipationMessage("");
-  };
-
-  const startGame = () => {
-    if (hasAlreadyParticipated) {
-      setParticipationMessage(
-        "You have already participated in this weekly game event. You can check the live leaderboard, but you cannot play again this week."
-      );
+  // WRITE TRANSACTION SUBMISSION LOOP (FIXED READBACK PATTERNS)
+  const submitAnswer = async (): Promise<void> => {
+    if (!walletAddress) {
+      alert("Connect wallet first");
+      return;
+    }
+    if (!username) {
+      alert("Connect Discord identity first");
+      return;
+    }
+    if (!answer.trim()) {
+      alert("Enter an answer");
       return;
     }
 
-    setParticipationMessage("");
-    setGameStarted(true);
-  };
+    try {
+      setIsSubmitting(true);
+      setRawContractOutput("Processing transaction on GenLayer...");
 
-  const goHome = () => {
-    setShowLeaderboard(false);
+      const client = createClient({
+        chain: studionet,
+        account: walletAddress as `0x${string}`,
+      });
 
-    if (finished || hasAlreadyParticipated) {
-      setGameStarted(false);
+      const hash = await client.writeContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "submit_answer",
+        args: [username, answer],
+        value: BigInt(0),
+      });
+
+      setTxHash(String(hash));
+
+      await client.waitForTransactionReceipt({
+        hash,
+        status: TransactionStatus.FINALIZED,
+        interval: 5000, 
+        retries: 60,    
+      });
+
+      // Fixed: Updated post-receipt read loop to check specific address keys
+      const result = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "get_result",
+        args: [walletAddress],
+      });
+
+      const resultString = JSON.stringify(result);
+      setRawContractOutput(resultString);
+
+      let parsedScore = 0;
+      let parsedFeedback = String(result);
+
+      if (result && resultString !== "{}" && resultString !== '""') {
+        try {
+          const cleanData = typeof result === "string" ? JSON.parse(result) : result;
+          if (cleanData && typeof cleanData === "object") {
+            if (cleanData.score !== undefined) parsedScore = Number(cleanData.score);
+            if (cleanData.feedback !== undefined) parsedFeedback = String(cleanData.feedback);
+          }
+        } catch (e) {}
+      }
+
+      setScore(parsedScore);
+      setFeedback(parsedFeedback);
+
+      socket.emit("submitPromptResult", {
+        score: parsedScore,
+        feedback: parsedFeedback,
+        txHash: String(hash),
+        walletAddress,
+        username: username 
+      });
+
+      alert("🎉 Submission successful! Processing complete on GenLayer.");
+    } catch (err: any) {
+      console.error("GenLayer Submission Detail Logs:", err);
+      setRawContractOutput(`Error logging execution path: ${err?.message || JSON.stringify(err)}`);
+      alert(`Submission failed: ${err?.message || err || "Verify token gas balance."}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSubmit = () => {
-    if (selectedAnswer === null || submitted) return;
-
-    if (selectedAnswer === currentChallenge.correct) {
-      setScore((prev) => prev + 10);
-    }
-
-    setSubmitted(true);
+  const scrollToLeaderboard = () => {
+    setShowArena(true);
+    setTimeout(() => {
+      const element = document.getElementById("leaderboard-section");
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 100);
   };
 
-  const nextQuestion = () => {
-    if (challengeIndex + 1 < challenges.length) {
-      setChallengeIndex((prev) => prev + 1);
-      setSelectedAnswer(null);
-      setSubmitted(false);
-      return;
+  const isFullyAuthenticated = walletAddress && username;
+
+  const getHeaderProfileText = () => {
+    if (!walletAddress) {
+      return "Connect Wallet";
     }
-
-    const finalScore = score;
-    const completionTime = GAME_DURATION - timeLeft;
-
-    setFinished(true);
-
-    console.log("Submitting to GenLayer contract:", GENLAYER_CONTRACT);
-
-    socket.emit("submitFinalScore", {
-      finalScore,
-      completionTime,
-    });
+    if (username) {
+      return `👾 ${username} ▾`;
+    }
+    return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)} ▾`;
   };
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-
-  const LeaderboardView = () => (
-    <div className="card">
-      <h2>🏆 Live Leaderboard</h2>
-
-      <p className="footer">
-        Ranking is based on score first. If scores are tied, faster completion
-        time ranks higher.
-      </p>
-
-      <div className="leaderboard">
-        {leaderboard.length === 0 ? (
-          <p className="footer">No players on the leaderboard yet.</p>
-        ) : (
-          leaderboard.map((player, index) => (
-            <div
-              key={player.id}
-              className={`player ${
-                player.name === username ? "highlight" : ""
-              }`}
-            >
-              <span>
-                #{index + 1} {player.name}
-              </span>
-
-              <span>
-                {player.score} / {MAX_SCORE}
-                {player.submitted && ` • ${player.completionTime}s`}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-
-      <button onClick={goHome}>Back to Home</button>
-    </div>
-  );
 
   return (
-    <div className="container">
-      <h1>🎮 Prompt Battle Arena</h1>
+    <>
+      <style>{`
+        body, html, #root {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          min-height: 100vh;
+          background-color: #0b0e14 !important;
+          color: #f0f2f5;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        .landing-page {
+          background-color: #0b0e14;
+          min-height: 100vh;
+          padding: 100px 20px 60px 20px;
+          box-sizing: border-box;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+        .hero {
+          text-align: center;
+          margin-bottom: 50px;
+        }
+        .hero h1 {
+          font-size: 2.8rem;
+          color: #ffffff;
+          margin-bottom: 16px;
+        }
+        .hero-text {
+          font-size: 1.2rem;
+          color: #94a3b8;
+        }
+        .info-section {
+          background: #111827;
+          border: 1px solid #1f2937;
+          border-radius: 12px;
+          padding: 24px;
+          margin-bottom: 24px;
+        }
+        .info-section h2 {
+          margin-top: 0;
+          color: #3498db;
+          font-size: 1.5rem;
+        }
+        .info-section p, .info-section ul {
+          color: #cbd5e1;
+          line-height: 1.6;
+        }
+        .info-section ul {
+          padding-left: 20px;
+        }
+        .info-section li {
+          margin-bottom: 8px;
+        }
+        .cta-banner {
+          text-align: center;
+          background: linear-gradient(135deg, #1e1b4b 0%, #111827 100%);
+          border: 1px solid #312e81;
+          border-radius: 16px;
+          padding: 40px 20px;
+          margin-top: 40px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .cta-banner h2 {
+          color: #ffffff;
+          margin-bottom: 24px;
+        }
+        .join-btn {
+          background-color: #3498db;
+          color: #ffffff;
+          border: none;
+          padding: 16px 36px;
+          font-size: 1.1rem;
+          font-weight: 700;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background 0.2s, transform 0.1s;
+        }
+        .join-btn:hover {
+          background-color: #2980b9;
+          transform: translateY(-1px);
+        }
+        
+        .dropdown-menu {
+          position: absolute;
+          top: 42px;
+          right: 0;
+          background-color: #111827;
+          border: 1px solid #1f2937;
+          border-radius: 8px;
+          width: 160px;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          z-index: 100;
+        }
+        .dropdown-item {
+          background: none;
+          border: none;
+          color: #cbd5e1;
+          padding: 12px 16px;
+          text-align: left;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          width: 100%;
+          font-family: inherit;
+          transition: background 0.15s, color 0.15s;
+        }
+        .dropdown-item:hover {
+          background-color: #1f2937;
+          color: #ffffff;
+        }
+        .dropdown-item.signout-color {
+          color: #e74c3c;
+        }
+        .dropdown-item.signout-color:hover {
+          background-color: rgba(231, 76, 60, 0.1);
+          color: #ff6b6b;
+        }
 
-      <p className="subtitle">Weekly GenLayer Community Challenge</p>
+        .container {
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 40px 20px;
+        }
+        .card {
+          background: #111827;
+          border: 1px solid #1f2937;
+          border-radius: 16px;
+          padding: 32px;
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .card h1 {
+          font-size: 2.2rem;
+          margin-top: 0;
+          margin-bottom: 8px;
+          color: #ffffff;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .subtitle {
+          color: #94a3b8;
+          margin-bottom: 32px;
+          font-size: 1rem;
+        }
+        .question {
+          background: #1f2937;
+          border: 1px solid #374151;
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 24px;
+        }
+        .question h3 {
+          margin-top: 0;
+          color: #9b59b6;
+          font-size: 1.2rem;
+          margin-bottom: 12px;
+        }
+        .question p {
+          color: #e2e8f0;
+          margin: 0;
+          font-size: 1.1rem;
+          line-height: 1.6;
+        }
+        textarea {
+          width: 100%;
+          background: #0b0e14;
+          border: 1px solid #374151;
+          color: #ffffff;
+          font-family: inherit;
+          font-size: 1.05rem;
+          line-height: 1.5;
+          resize: vertical;
+          box-sizing: border-box;
+          transition: border-color 0.2s;
+        }
+        textarea:focus {
+          outline: none;
+          border-color: #3498db;
+        }
+        button {
+          background-color: #3498db;
+          color: white;
+          border: none;
+          padding: 14px 28px;
+          font-size: 1.05rem;
+          font-weight: 600;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: inherit;
+          transition: background 0.2s;
+        }
+        button:hover:not(:disabled) {
+          background-color: #2980b9;
+        }
+        button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .sync-btn {
+          background-color: #27ae60;
+          padding: 8px 16px;
+          font-size: 0.9rem;
+        }
+        .sync-btn:hover:not(:disabled) {
+          background-color: #219653;
+        }
+        .leaderboard {
+          margin-top: 48px;
+          border-top: 1px solid #1f2937;
+          padding-top: 32px;
+        }
+        .leaderboard h2 {
+          font-size: 1.8rem;
+          color: #ffffff;
+          margin-top: 0;
+          margin-bottom: 20px;
+        }
+        .player {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 14px 20px;
+          background: #1f2937;
+          border: 1px solid #374151;
+          border-radius: 8px;
+          margin-bottom: 12px;
+          font-size: 1.05rem;
+        }
+        .player.highlight {
+          border-color: #9b59b6;
+          background: rgba(155, 89, 182, 0.1);
+        }
+        .footer {
+          text-align: center;
+          margin-top: 40px;
+          color: #64748b;
+          font-size: 0.9rem;
+        }
+      `}</style>
 
-      {joined && (
-        <div className="card" style={{ marginBottom: "18px" }}>
-          <div className="topbar">
-            <button onClick={goHome}>Home</button>
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          padding: "20px 40px",
+          position: "absolute",
+          top: 0,
+          right: 0,
+          zIndex: 10,
+          height: "60px",
+          left: 0,
+          boxSizing: "border-box"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "24px", height: "100%" }}>
+          <button
+            onClick={scrollToLeaderboard}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: "16px",
+              fontWeight: "600",
+              padding: "0",
+              margin: "0",
+              fontFamily: "inherit",
+              display: "flex",
+              alignItems: "center",
+              height: "36px"
+            }}
+          >
+            Leaderboard
+          </button>
+          
+          <button
+            onClick={() => window.open("https://testnet-faucet.genlayer.foundation/", "_blank", "noopener,noreferrer")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: "16px",
+              fontWeight: "600",
+              padding: "0",
+              margin: "0",
+              fontFamily: "inherit",
+              display: "flex",
+              alignItems: "center",
+              height: "36px"
+            }}
+          >
+            Faucet
+          </button>
 
-            <button onClick={() => setShowLeaderboard(true)}>
-              Leaderboard
+          <div ref={dropdownRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => {
+                if (!walletAddress) {
+                  connectWallet();
+                } else {
+                  setDropdownOpen(!dropdownOpen);
+                }
+              }}
+              style={{
+                backgroundColor: walletAddress ? (username ? "#9b59b6" : "#27ae60") : "#3498db",
+                border: "none",
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "600",
+                padding: "0 16px",
+                borderRadius: "8px",
+                fontFamily: "inherit",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "36px",
+                textOverflow: "ellipsis",
+                overflow: "hidden",
+                maxWidth: "240px",
+                whiteSpace: "nowrap",
+                margin: "0"
+              }}
+            >
+              {getHeaderProfileText()}
             </button>
 
-            <button onClick={disconnectDiscord}>
-              Disconnect
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showLeaderboard ? (
-        <LeaderboardView />
-      ) : !joined ? (
-        <div className="card">
-          <h2>Join With Discord</h2>
-
-          <p className="footer">
-            Connect your Discord account to enter the weekly GenLayer arena.
-          </p>
-
-          <button onClick={loginWithDiscord}>Continue with Discord</button>
-        </div>
-      ) : !gameStarted ? (
-        <div className="card">
-          <h2>Welcome, {username} 👋</h2>
-
-          {hasAlreadyParticipated && (
-            <div className="question">
-              <p>You have already participated in this weekly game event.</p>
-
-              <p>
-                Your recorded score is {currentPlayer?.score} / {MAX_SCORE}
-                {currentPlayer?.completionTime
-                  ? ` and your completion time is ${currentPlayer.completionTime}s.`
-                  : "."}
-              </p>
-
-              <p>
-                You can check the live leaderboard, but you cannot replay this
-                weekly event.
-              </p>
-            </div>
-          )}
-
-          {participationMessage && (
-            <div className="question">
-              <p>{participationMessage}</p>
-            </div>
-          )}
-
-          <div className="question">
-            <p>
-              GenLayer is a Web3 protocol focused on Intelligent Contracts,
-              AI-powered reasoning, and trustless adjudication.
-            </p>
-
-            <p>
-              This game includes a deployed GenLayer Intelligent Contract for
-              score tracking.
-            </p>
-
-            <h3>Game Rules</h3>
-
-            <p>• You will answer 25 GenLayer-focused questions.</p>
-            <p>• You have 5 minutes to complete the game.</p>
-            <p>• Each correct answer gives 10 XP.</p>
-            <p>• Incorrect answers give 0 score.</p>
-            <p>• Maximum possible score is 250 XP.</p>
-            <p>• Same score = faster completion time ranks higher.</p>
-            <p>• Each Discord account can participate only once per weekly event.</p>
-            <p>• Results are connected to a deployed GenLayer contract.</p>
-
-            <p>Contract Address:</p>
-            <p>{GENLAYER_CONTRACT}</p>
-          </div>
-
-          <button onClick={startGame}>PLAY</button>
-        </div>
-      ) : finished ? (
-        <div className="card">
-          <h2>🏆 Final Leaderboard</h2>
-
-          <p className="footer">
-            Your Final Score: {score} / {MAX_SCORE}
-          </p>
-
-          <div className="leaderboard">
-            {leaderboard.map((player, index) => (
-              <div
-                key={player.id}
-                className={`player ${
-                  player.name === username ? "highlight" : ""
-                }`}
-              >
-                <span>
-                  #{index + 1} {player.name}
-                </span>
-
-                <span>
-                  {player.score} / {MAX_SCORE}
-                  {player.submitted && ` • ${player.completionTime}s`}
-                </span>
+            {dropdownOpen && walletAddress && (
+              <div className="dropdown-menu">
+                <button className="dropdown-item" onClick={handleGoHome}>
+                  🏠 Home
+                </button>
+                <button className="dropdown-item signout-color" onClick={handleSignOut}>
+                  🚪 Sign Out
+                </button>
               </div>
-            ))}
+            )}
+          </div>
+        </div>
+      </header>
+
+      {!showArena ? (
+        <div className="landing-page">
+          <div className="hero">
+            <h1>🧠 GenLayer Prompt Battle Arena</h1>
+            <p className="hero-text">
+              Challenge AI. Earn XP. Climb the Leaderboard.
+              Compete with the Community.
+            </p>
           </div>
 
-          <button onClick={goHome}>Back to Home</button>
+          <section className="info-section">
+            <h2>What is GenLayer?</h2>
+            <p>
+              GenLayer is a blockchain built for Intelligent
+              Contracts, enabling AI-powered reasoning and
+              natural language understanding directly on-chain.
+            </p>
+          </section>
+
+          <section className="info-section">
+            <h2>How Prompt Battle Works</h2>
+            <p>
+              Players answer prompts. GenLayer evaluates the
+              response and awards XP based on quality,
+              reasoning, and relevance.
+            </p>
+          </section>
+
+          <section className="info-section">
+            <h2>🏆 XP & Rankings</h2>
+            <ul>
+              <li>Better answers earn more XP.</li>
+              <li>XP determines leaderboard position.</li>
+              <li>Discord username is your identity.</li>
+              <li>Wallet verifies participation.</li>
+            </ul>
+          </section>
+
+          <section className="info-section">
+            <h2>⚔ Multiplayer Vision</h2>
+            <p>
+              Future updates will introduce live multiplayer
+              battles, tournaments, seasonal rankings and
+              community competitions.
+            </p>
+          </section>
+
+          <div className="cta-banner">
+            <h2>Ready to Challenge the AI?</h2>
+            <button
+              className="join-btn"
+              onClick={handleEnterArenaClick}
+            >
+              ENTER THE ARENA
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="card">
-          <div className="topbar">
-            <span>Room: {roomId}</span>
+        <div className="container" style={{ marginTop: "80px" }}>
+          <div className="card">
+            <h1>
+              <span>GenLayer Prompt Battle Arena</span>
+              {walletAddress && (
+                <button 
+                  className="sync-btn" 
+                  onClick={refreshContractState} 
+                  disabled={isSyncing || isSubmitting}
+                >
+                  {isSyncing ? "Syncing..." : "🔄 Refresh Score"}
+                </button>
+              )}
+            </h1>
+            <p className="subtitle">
+              Complete your verification profiles to see the active game challenge stage.
+            </p>
 
-            <span>
-              ⏱ {minutes}:{seconds < 10 ? `0${seconds}` : seconds}
-            </span>
-          </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", margin: "20px 0" }}>
+              <div className="question">
+                Wallet Status:{" "}
+                {walletAddress ? (
+                  <strong>Connected ({walletAddress})</strong>
+                ) : (
+                  <span>
+                    <strong style={{ color: "#e74c3c" }}>Disconnected</strong>{" "}
+                    <button onClick={connectWallet} style={{ padding: "4px 10px", fontSize: "12px", marginLeft: "10px" }}>
+                      Connect Wallet
+                    </button>
+                  </span>
+                )}
+              </div>
 
-          <p className="footer">Logged in as: {username}</p>
+              {!username ? (
+                <div style={{ padding: "15px", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "8px", textAlign: "center" }}>
+                  <p style={{ marginBottom: "12px" }}>To participate on the leaderboard ranking pool, link your Discord profile handle identity.</p>
+                  <button onClick={connectDiscordIdentity}>
+                    Connect Discord Identity
+                  </button>
+                </div>
+              ) : (
+                <div className="question">
+                  Identity Registered: <strong>{username}</strong>
+                </div>
+              )}
+            </div>
 
-          <p className="footer">
-            Question {challengeIndex + 1} / {challenges.length}
-          </p>
+            {isFullyAuthenticated ? (
+              <>
+                <div className="question">
+                  <h3>Prompt</h3>
+                  <p>{promptText}</p>
+                </div>
 
-          <p className="footer">
-            Current Score: {score} / {MAX_SCORE}
-          </p>
-
-          <h2>{currentChallenge.title}</h2>
-
-          <div className="question">
-            <p>{currentChallenge.question}</p>
-
-            {currentChallenge.options.map((option, index) => (
-              <label key={index}>
-                <input
-                  type="radio"
-                  name="answer"
-                  checked={selectedAnswer === index}
-                  onChange={() => setSelectedAnswer(index)}
-                  disabled={submitted}
+                <textarea
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  placeholder="Write your answer..."
+                  style={{
+                    width: "100%",
+                    minHeight: "180px",
+                    marginTop: "20px",
+                    borderRadius: "12px",
+                    padding: "14px",
+                  }}
                 />
 
-                {String.fromCharCode(65 + index)}. {option}
-              </label>
-            ))}
-          </div>
+                <button
+                  onClick={submitAnswer}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? "Submitting..."
+                    : "Submit To GenLayer"}
+                </button>
+              </>
+            ) : (
+              <div style={{ textAlign: "center", padding: "20px", opacity: 0.6 }}>
+                🔒 <em>Please complete verification profiles to access active prompts.</em>
+              </div>
+            )}
 
-          {!submitted ? (
-            <button onClick={handleSubmit}>Submit Answer</button>
-          ) : (
-            <>
-              <p className="footer">
-                {selectedAnswer === currentChallenge.correct
-                  ? "✅ Correct Answer"
-                  : "❌ Incorrect Answer"}
+            {/* LIVE DATA STAGE DIAGNOSTIC BOX */}
+            {rawContractOutput && (
+              <div style={{ marginTop: "24px", padding: "16px", backgroundColor: "#1e293b", border: "1px dashed #475569", borderRadius: "8px" }}>
+                <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold", letterSpacing: "0.05em" }}>🔍 RAW SMART CONTRACT RETURN VALUE:</span>
+                <pre style={{ margin: "8px 0 0 0", fontSize: "12px", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "#cbd5e1", fontFamily: "monospace" }}>{rawContractOutput}</pre>
+              </div>
+            )}
+
+            {score !== null && (
+              <div className="question" style={{ marginTop: "20px", borderLeft: "4px solid #9b59b6" }}>
+                <h3>Your Last Result</h3>
+                <p><strong>Score:</strong> {score} XP</p>
+                <p><strong>Feedback:</strong><br />{feedback}</p>
+                <p><strong>Transaction Hash:</strong><br /><span style={{ fontSize: "12px", opacity: 0.7 }}>{txHash}</span></p>
+              </div>
+            )}
+
+            <div id="leaderboard-section" className="leaderboard" style={{ marginTop: "40px" }}>
+              <h2>Leaderboard</h2>
+              {players.length === 0 ? (
+                <p>No players yet.</p>
+              ) : (
+                players.map((player, index) => (
+                  <div
+                    key={player.id}
+                    className={`player ${
+                      player.name === username
+                        ? "highlight"
+                        : ""
+                    }`}
+                  >
+                    <div>
+                      #{index + 1} - {player.name}
+                    </div>
+                    <div>
+                      {player.score} XP
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="footer">
+              <p>
+                Powered by GenLayer Intelligent Contracts
               </p>
-
-              <button onClick={nextQuestion}>
-                {challengeIndex + 1 === challenges.length
-                  ? "Finish Game"
-                  : "Next Question"}
-              </button>
-            </>
-          )}
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
