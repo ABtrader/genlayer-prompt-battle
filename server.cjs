@@ -1,8 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const fs = require('fs');
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,68 +9,93 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-// This creates a physical file named leaderboard.json inside your project folder
-const FILE_PATH = path.join(__dirname, 'leaderboard.json');
+// Initializing Supabase with the environment variables set up on Render
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Helper: Opens the notebook and reads saved scores when server starts
-function loadPlayers() {
+// Helper function to fetch and format scores so the frontend can read them seamlessly
+async function getLeaderboardData() {
   try {
-    if (fs.existsSync(FILE_PATH)) {
-      const data = fs.readFileSync(FILE_PATH, 'utf8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error("Error reading leaderboard file:", error);
+    const { data, error } = await supabase
+      .from('leaderboard')
+      .select('*')
+      .order('total_score', { ascending: false });
+
+    if (error) throw error;
+
+    // Map database snake_case keys back to the camelCase keys your App.tsx frontend expects
+    return (data || []).map(player => ({
+      username: player.username || 'Anonymous',
+      walletAddress: player.wallet_address,
+      score: player.total_score || 0,
+      feedback: player.feedback,
+      txHash: player.genlayer_tx_hash
+    }));
+  } catch (err) {
+    console.error("Failed to fetch leaderboard from Supabase:", err);
+    return [];
   }
-  return [];
 }
 
-// Helper: Writes new scores into the notebook to save them safely
-function savePlayers(playersList) {
-  try {
-    fs.writeFileSync(FILE_PATH, JSON.stringify(playersList, null, 2), 'utf8');
-  } catch (error) {
-    console.error("Error writing to leaderboard file:", error);
-  }
-}
-
-// Initialize our players list using the saved file
-let players = loadPlayers();
-
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   console.log(`User connected: ${socket.id}`);
   
-  // Hand the current leaderboard to the user the second they connect/refresh
-  socket.emit('gameState', { players });
+  // Send current live database rankings to the user immediately on connection/refresh
+  const initialPlayers = await getLeaderboardData();
+  socket.emit('gameState', { players: initialPlayers });
 
-  socket.on('submitPromptResult', (data) => {
-    const existingPlayerIndex = players.findIndex(p => p.walletAddress === data.walletAddress);
+  // Handle incoming results from the frontend game loop
+  socket.on('submitPromptResult', async (data) => {
+    console.log("Received result submission from frontend:", data);
 
-    const playerData = {
-      username: data.username || 'Anonymous',
-      walletAddress: data.walletAddress,
-      score: parseInt(data.score) || 0,
-      feedback: data.feedback,
-      txHash: data.txHash,
-      timestamp: new Date().toISOString()
-    };
+    const walletAddress = data.walletAddress;
+    const newScore = parseInt(data.score) || 0;
 
-    if (existingPlayerIndex !== -1) {
-      if (playerData.score > players[existingPlayerIndex].score) {
-        players[existingPlayerIndex] = playerData;
+    try {
+      // Check if this wallet already exists in your table
+      const { data: existing, error: fetchError } = await supabase
+        .from('leaderboard')
+        .select('*')
+        .eq('wallet_address', walletAddress)
+        .maybeSingle();
+
+      if (existing) {
+        // Only update if their new score beats their old score
+        if (newScore > (existing.total_score || 0)) {
+          await supabase
+            .from('leaderboard')
+            .update({ 
+              total_score: newScore, 
+              feedback: data.feedback, 
+              genlayer_tx_hash: data.txHash,
+              updated_at: new Date().toISOString()
+            })
+            .eq('wallet_address', walletAddress);
+          console.log(`Updated high score for wallet: ${walletAddress}`);
+        }
+      } else {
+        // Insert a brand new record if the wallet isn't in the database yet
+        await supabase
+          .from('leaderboard')
+          .insert([{
+            username: data.username || 'Anonymous',
+            wallet_address: walletAddress,
+            total_score: newScore,
+            feedback: data.feedback,
+            genlayer_tx_hash: data.txHash,
+            updated_at: new Date().toISOString()
+          }]);
+        console.log(`Created new leaderboard profile for wallet: ${walletAddress}`);
       }
-    } else {
-      players.push(playerData);
+
+      // Fetch the updated rankings and broadcast them out to everyone live
+      const updatedPlayers = await getLeaderboardData();
+      io.emit('gameState', { players: updatedPlayers });
+
+    } catch (err) {
+      console.error("Supabase Operation Error:", err);
     }
-
-    // Sort leaderboard from highest score to lowest
-    players.sort((a, b) => b.score - a.score);
-
-    // Save it to the file system right now!
-    savePlayers(players);
-
-    // Tell all connected browsers to update their screens
-    io.emit('gameState', { players });
   });
 
   socket.on('disconnect', () => {
