@@ -6,10 +6,8 @@ import { TransactionStatus } from "genlayer-js/types";
 
 const CONTRACT_ADDRESS = "0xa2b82A505C37b344622F5498057Fa6327e988b8c";
 
-const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL ||
-  "https://your-render-backend.onrender.com";
-
+// 1. Dynamic endpoint fallbacks targeting your live Render cluster
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://genlayer-prompt-battle.onrender.com";
 const socket: Socket = io(BACKEND_URL);
 
 const PROMPTS = [
@@ -20,9 +18,10 @@ const PROMPTS = [
   "Why is AI consensus useful for games?"
 ];
 
+// Aligned with the exact key schemas emitted by your Node backend
 type Player = {
-  id: string;
-  name: string;
+  walletAddress: string;
+  username: string;
   score: number;
 };
 
@@ -42,14 +41,20 @@ export default function App() {
   const [txHash, setTxHash] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
   const [score, setScore] = useState<number | null>(null);
+  const [promptIndex, setPromptIndex] = useState<number>(0);
 
   const [rawContractOutput, setRawContractOutput] = useState<string>("");
 
-  const promptText = useMemo(() => {
-    return PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+  // Selects an initial stable random prompt index on load
+  useEffect(() => {
+    setPromptIndex(Math.floor(Math.random() * PROMPTS.length));
   }, []);
 
-  // Real-time leaderboard listener loop
+  const promptText = useMemo(() => {
+    return PROMPTS[promptIndex];
+  }, [promptIndex]);
+
+  // Real-time leaderboard loop
   useEffect(() => {
     socket.on("gameState", (data: { players?: Player[] }) => {
       if (data?.players) {
@@ -63,14 +68,13 @@ export default function App() {
     };
   }, []);
 
-  // Room synchronization whenever the checked identity state shifts
   useEffect(() => {
     if (username) {
       socket.emit("joinRoom", username);
     }
   }, [username]);
 
-  // AUTOMATED ACCOUNT & DISCONNECT LISTENER CHAIN
+  // Automated account listener tracks wallet states
   useEffect(() => {
     const ethereum = (window as any).ethereum;
     if (!ethereum) return;
@@ -108,7 +112,6 @@ export default function App() {
     };
   }, []);
 
-  // Dropdown background click tracking
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -175,7 +178,6 @@ export default function App() {
     setShowArena(true);
   };
 
-  // EXPLICIT MANUAL DATA REFRESH FUNCTION (FIXED ARGUMENTS & PARSING)
   const refreshContractState = async (): Promise<void> => {
     if (!walletAddress) return;
     try {
@@ -187,7 +189,6 @@ export default function App() {
         account: walletAddress as `0x${string}`,
       });
 
-      // Fixed: Swapped functionName to get_result and explicitly passed wallet address
       const result = await client.readContract({
         address: CONTRACT_ADDRESS,
         functionName: "get_result",
@@ -202,7 +203,6 @@ export default function App() {
 
       if (result && resultString !== "{}" && resultString !== '""') {
         try {
-          // Unpack Python JSON string mapping format
           const cleanData = typeof result === "string" ? JSON.parse(result) : result;
           if (cleanData && typeof cleanData === "object") {
             if (cleanData.score !== undefined) parsedScore = Number(cleanData.score);
@@ -223,7 +223,6 @@ export default function App() {
     }
   };
 
-  // WRITE TRANSACTION SUBMISSION LOOP (FIXED READBACK PATTERNS)
   const submitAnswer = async (): Promise<void> => {
     if (!walletAddress) {
       alert("Connect wallet first");
@@ -240,7 +239,7 @@ export default function App() {
 
     try {
       setIsSubmitting(true);
-      setRawContractOutput("Processing transaction on GenLayer...");
+      setRawContractOutput("Processing transaction via GenVM AI Execution Engines...");
 
       const client = createClient({
         chain: studionet,
@@ -263,7 +262,6 @@ export default function App() {
         retries: 60,    
       });
 
-      // Fixed: Updated post-receipt read loop to check specific address keys
       const result = await client.readContract({
         address: CONTRACT_ADDRESS,
         functionName: "get_result",
@@ -289,6 +287,7 @@ export default function App() {
       setScore(parsedScore);
       setFeedback(parsedFeedback);
 
+      // Emitting matching schema structure keys to Node/Supabase pipeline
       socket.emit("submitPromptResult", {
         score: parsedScore,
         feedback: parsedFeedback,
@@ -296,6 +295,10 @@ export default function App() {
         walletAddress,
         username: username 
       });
+
+      // Advance stage to another prompt challenge selection loop path automatically
+      setPromptIndex((prev) => (prev + 1) % PROMPTS.length);
+      setAnswer("");
 
       alert("🎉 Submission successful! Processing complete on GenLayer.");
     } catch (err: any) {
@@ -320,12 +323,8 @@ export default function App() {
   const isFullyAuthenticated = walletAddress && username;
 
   const getHeaderProfileText = () => {
-    if (!walletAddress) {
-      return "Connect Wallet";
-    }
-    if (username) {
-      return `👾 ${username} ▾`;
-    }
+    if (!walletAddress) return "Connect Wallet";
+    if (username) return `👾 ${username} ▾`;
     return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)} ▾`;
   };
 
@@ -806,9 +805,7 @@ export default function App() {
                   onClick={submitAnswer}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting
-                    ? "Submitting..."
-                    : "Submit To GenLayer"}
+                  {isSubmitting ? "Submitting..." : "Submit To GenLayer"}
                 </button>
               </>
             ) : (
@@ -817,7 +814,6 @@ export default function App() {
               </div>
             )}
 
-            {/* LIVE DATA STAGE DIAGNOSTIC BOX */}
             {rawContractOutput && (
               <div style={{ marginTop: "24px", padding: "16px", backgroundColor: "#1e293b", border: "1px dashed #475569", borderRadius: "8px" }}>
                 <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold", letterSpacing: "0.05em" }}>🔍 RAW SMART CONTRACT RETURN VALUE:</span>
@@ -841,15 +837,11 @@ export default function App() {
               ) : (
                 players.map((player, index) => (
                   <div
-                    key={player.id}
-                    className={`player ${
-                      player.name === username
-                        ? "highlight"
-                        : ""
-                    }`}
+                    key={player.walletAddress || index}
+                    className={`player ${player.username === username ? "highlight" : ""}`}
                   >
                     <div>
-                      #{index + 1} - {player.name}
+                      #{index + 1} - {player.username || "Anonymous"}
                     </div>
                     <div>
                       {player.score} XP
@@ -860,9 +852,7 @@ export default function App() {
             </div>
 
             <div className="footer">
-              <p>
-                Powered by GenLayer Intelligent Contracts
-              </p>
+              <p>Powered by GenLayer Intelligent Contracts</p>
             </div>
           </div>
         </div>
