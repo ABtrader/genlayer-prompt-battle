@@ -11,7 +11,7 @@ const io = new Server(server, {
 
 // Initializing Supabase with the environment variables set up on Render
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helper function to fetch and format scores so the frontend can read them seamlessly
