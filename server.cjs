@@ -152,19 +152,18 @@ io.on("connection", (socket) => {
     await broadcastLeaderboard();
   });
 
-  socket.on("submitFinalScore", async ({ finalScore, completionTime }) => {
+  socket.on(
+  "submitPromptResult",
+  async ({
+    score,
+    feedback,
+    txHash,
+    walletAddress,
+  }) => {
     const username = connectedUsers.get(socket.id);
 
     if (!username) {
       console.log("No username found for this socket");
-      return;
-    }
-
-    const weeklyScore = Number(finalScore || 0);
-    const timeTaken = Number(completionTime || 0);
-
-    if (weeklyScore <= 0) {
-      console.log("Rejected zero score");
       return;
     }
 
@@ -185,31 +184,40 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const previousTotal = Number(existingPlayer?.total_score || 0);
-    const updatedTotal = previousTotal + weeklyScore;
+    const previousTotal = Number(
+      existingPlayer?.total_score || 0
+    );
+
+    const promptScore = Number(score || 0);
 
     const payload = {
       username,
-      total_score: updatedTotal,
-      last_weekly_score: weeklyScore,
+      wallet_address: walletAddress || "",
+      total_score: previousTotal + promptScore,
+      last_weekly_score: promptScore,
+      feedback: feedback || "",
+      genlayer_tx_hash: txHash || "",
       submitted: true,
-      completion_time: timeTaken,
       updated_at: new Date().toISOString(),
     };
 
     const { error: upsertError } = await supabase
       .from("leaderboard")
-      .upsert(payload, { onConflict: "username" });
+      .upsert(payload, {
+        onConflict: "username",
+      });
 
     if (upsertError) {
-      console.error("Score save error:", upsertError);
+      console.error(
+        "Prompt result save error:",
+        upsertError
+      );
       return;
     }
 
-    await submitToGenLayer(username, weeklyScore, timeTaken);
-
     await broadcastLeaderboard();
-  });
+  }
+);
 
   socket.on("disconnect", () => {
     connectedUsers.delete(socket.id);
