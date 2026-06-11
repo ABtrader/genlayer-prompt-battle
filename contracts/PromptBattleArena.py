@@ -4,17 +4,15 @@ import json
 from genlayer import *
 
 
-class PromptBattleArenaV6(gl.Contract):
+class PromptBattleArenaV7(gl.Contract):
     player_results: TreeMap[Address, str]
 
     def __init__(self):
-        # Initializing the TreeMap per SDK spec
         self.player_results = TreeMap()
 
     @gl.public.write
     def submit_answer(self, player_name: str, answer: str) -> None:
 
-        # Defining the inner evaluation function that must execute within the nondet loop
         def evaluate_answer() -> str:
             prompt = f"""
 You are judging a GenLayer community challenge.
@@ -28,27 +26,31 @@ Player:
 Answer:
 {answer}
 
-Score the answer from 0 to 100 based on accuracy and creativity.
+Evaluate the response quality and assign ONE of these letter grades:
+- "A" for excellent, deep, accurate, and creative answers.
+- "B" for good, accurate answers that lack extreme depth.
+- "C" for poor, empty, incomplete, or completely off-topic answers (e.g., placeholder text like "just for game").
 
-Return ONLY an integer number between 0 and 100.
-Do not include any words, symbols, or formatting. Just the plain digits.
+Return ONLY the single letter: A, B, or C.
+Do not include any other words, symbols, or formatting. Just the plain capital letter.
 """
             res = gl.nondet.exec_prompt(prompt)
-            # Standard pattern: strip out everything except numeric digits to force exact match consensus
-            clean_digits = "".join(c for c in res if c.isdigit()).strip()
-            return clean_digits if clean_digits else "80"
+            clean_letter = "".join(c for c in res if c.isalpha()).strip().upper()
+            return clean_letter if clean_letter in ["A", "B", "C"] else "C"
 
-        # CORRECT SDK CALL: Passing the callable function directly into strict_eq
-        final_score_str = gl.eq_principle.strict_eq(evaluate_answer)
+        # The AI nodes will easily agree on a single letter (A, B, or C)
+        final_grade = gl.eq_principle.strict_eq(evaluate_answer)
 
-        try:
-            score_val = int(final_score_str)
-        except Exception:
-            score_val = 80  # Safe fallback if string parsing acts up
+        # Map the consensus grade back to high-value XP scores
+        if final_grade == "A":
+            score_val = 95
+        elif final_grade == "B":
+            score_val = 75
+        else:
+            score_val = 0  # Off-topic or joke submissions get 0 XP
 
         feedback_text = f"The AI consensus successfully verified your answer and awarded you {score_val} XP!"
 
-        # Writing state changes strictly OUTSIDE the non-deterministic block
         self.player_results[gl.message.sender_address] = json.dumps(
             {
                 "player": player_name,

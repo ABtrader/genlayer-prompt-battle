@@ -4,7 +4,7 @@ import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import { TransactionStatus } from "genlayer-js/types";
 
-const CONTRACT_ADDRESS = "0xa2b82A505C37b344622F5498057Fa6327e988b8c";
+const CONTRACT_ADDRESS = "0x254988ED21675a2E48BfC6F1F4A3FD073393fE53";
 
 // Dynamic endpoint fallbacks targeting your live Render cluster
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://genlayer-prompt-battle.onrender.com";
